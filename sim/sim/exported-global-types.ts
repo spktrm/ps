@@ -34,7 +34,7 @@ export type SparseStatsTable = Partial<StatsTable>;
 export type BoostID = StatIDExceptHP | 'accuracy' | 'evasion';
 export type BoostsTable = { [boost in BoostID]: number };
 export type SparseBoostsTable = Partial<BoostsTable>;
-export type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Custom' | 'Gigantamax';
+export type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Custom' | 'Gmax';
 
 export type PokemonSet = import('./teams').PokemonSet;
 
@@ -97,15 +97,20 @@ export interface CommonHandlers {
 	VoidSourceMove: (this: Battle, source: Pokemon, target: Pokemon, move: ActiveMove) => void;
 }
 
+export type TableGenericTag = "True Past" | "Past Unobtainable";
+export type TableSpeciesTag = "Mythical" | "Restricted Legendary" | "Sub-Legendary" | "Ultra Beast" | "Paradox" | "Pokestar";
+export type TableTag = TableGenericTag | TableSpeciesTag;
+
 export interface EffectData {
 	name?: string;
-	desc?: string;
 	duration?: number;
 	durationCallback?: (this: Battle, target: Pokemon, source: Pokemon, effect: Effect | null) => number;
 	effectType?: string;
 	infiltrates?: boolean;
+	placeholderFor?: string;
 	isNonstandard?: Nonstandard | null;
-	shortDesc?: string;
+	/** "Are you or are you not on this list" data. */
+	tags?: TableTag[];
 }
 
 export type ModdedEffectData = EffectData | Partial<EffectData> & { inherit: true };
@@ -154,7 +159,7 @@ export interface BattleScriptsData {
 export interface ModdedBattleActions {
 	inherit?: true;
 	afterMoveSecondaryEvent?: (this: BattleActions, targets: Pokemon[], pokemon: Pokemon, move: ActiveMove) => undefined;
-	calcRecoilDamage?: (this: BattleActions, damageDealt: number, move: Move, pokemon: Pokemon) => number;
+	applyRecoilDamage?: (this: BattleActions, damageDealt: number, move: Move, pokemon: Pokemon) => number | null;
 	canMegaEvo?: (this: BattleActions, pokemon: Pokemon) => string | undefined | null;
 	canMegaEvoX?: (this: BattleActions, pokemon: Pokemon) => string | undefined | null;
 	canMegaEvoY?: (this: BattleActions, pokemon: Pokemon) => string | undefined | null;
@@ -273,7 +278,9 @@ export interface ModdedBattlePokemon {
 	boostBy?: (this: Pokemon, boost: SparseBoostsTable) => boolean | number;
 	clearBoosts?: (this: Pokemon) => void;
 	clearVolatile?: (this: Pokemon, includeSwitchFlags?: boolean) => void;
-	calculateStat?: (this: Pokemon, statName: StatIDExceptHP, boost: number, modifier?: number) => number;
+	calculateStat?: (
+		this: Pokemon, statName: StatIDExceptHP, boost: number, modifier?: number, statUser?: Pokemon
+	) => number;
 	cureStatus?: (this: Pokemon, silent?: boolean) => boolean;
 	deductPP?: (
 		this: Pokemon, move: string | Move, amount?: number | null, target?: Pokemon | null | false
@@ -413,47 +420,56 @@ export interface PlayerOptions {
 	seed?: PRNGSeed;
 }
 
+export type TranslationString = string | null;
+
 export interface BasicTextData {
-	desc?: string;
-	shortDesc?: string;
+	desc?: TranslationString;
+	shortDesc?: TranslationString;
+	grammar?: TranslationString;
+	articleRule?: 'stressed-a';
+	classified?: {
+		name: string,
+		grammar: string,
+		articleRule?: 'stressed-a',
+	};
 }
 export interface ConditionTextData extends BasicTextData {
-	activate?: string;
-	addItem?: string;
-	block?: string;
-	boost?: string;
-	cant?: string;
-	changeAbility?: string;
-	damage?: string;
-	end?: string;
-	heal?: string;
-	move?: string;
-	start?: string;
-	transform?: string;
+	activate?: TranslationString;
+	addItem?: TranslationString;
+	block?: TranslationString;
+	boost?: TranslationString;
+	cant?: TranslationString;
+	changeAbility?: TranslationString;
+	damage?: TranslationString;
+	end?: TranslationString;
+	heal?: TranslationString;
+	move?: TranslationString;
+	start?: TranslationString;
+	transform?: TranslationString;
 }
 
 export interface MoveTextData extends ConditionTextData {
-	alreadyStarted?: string;
-	blockSelf?: string;
-	clearBoost?: string;
-	endFromItem?: string;
-	fail?: string;
-	failSelect?: string;
-	failTooHeavy?: string;
-	failWrongForme?: string;
-	megaNoItem?: string;
-	prepare?: string;
-	removeItem?: string;
-	startFromItem?: string;
-	startFromZEffect?: string;
-	switchOut?: string;
-	takeItem?: string;
-	typeChange?: string;
-	upkeep?: string;
+	alreadyStarted?: TranslationString;
+	blockSelf?: TranslationString;
+	clearBoost?: TranslationString;
+	endFromItem?: TranslationString;
+	fail?: TranslationString;
+	failSelect?: TranslationString;
+	failTooHeavy?: TranslationString;
+	failWrongForme?: TranslationString;
+	megaNoItem?: TranslationString;
+	prepare?: TranslationString;
+	removeItem?: TranslationString;
+	startFromItem?: TranslationString;
+	startFromZEffect?: TranslationString;
+	switchOut?: TranslationString;
+	takeItem?: TranslationString;
+	typeChange?: TranslationString;
+	upkeep?: TranslationString;
 }
 
 export type TextFile<T> = T & {
-	name: string,
+	name: TranslationString,
 	gen1?: T,
 	gen2?: T,
 	gen3?: T,
@@ -461,20 +477,51 @@ export type TextFile<T> = T & {
 	gen5?: T,
 	gen6?: T,
 	gen7?: T,
+	gen7letsgo?: T,
 	gen8?: T,
+	gen8bdsp?: T,
 	champions?: T,
 };
 
 export type AbilityText = TextFile<ConditionTextData & {
-	activateFromItem?: string,
-	activateNoTarget?: string,
-	copyBoost?: string,
-	transformEnd?: string,
+	activateFromItem?: TranslationString,
+	activateNoTarget?: TranslationString,
+	copyBoost?: TranslationString,
+	transformEnd?: TranslationString,
 }>;
 export type MoveText = TextFile<MoveTextData>;
 export type ItemText = TextFile<ConditionTextData>;
-export type PokedexText = TextFile<BasicTextData>;
+export interface SpeciesText {
+	/**
+	 * Full species + short forme name - "Wormadam-Plant"
+	 *
+	 * Not the actual full official name, but the one Showdown uses that's
+	 * reasonably concise and mostly fits into teambuilder. Includes formes for
+	 * many but not all base formes. Can't contain parentheses because it's
+	 * designed to be used like "Go! Planty (Wormadam-Plant)".
+	 */
+	name?: TranslationString;
+	/** Species name by itself, without forme - "Wormadam" */
+	baseSpecies?: TranslationString;
+	/** Official forme name - "Plant Cloak" */
+	forme?: TranslationString;
+	grammar?: TranslationString;
+}
 export type DefaultText = AnyObject;
+export interface TagText {
+	name?: TranslationString;
+	/** used in move tooltips */
+	hint?: TranslationString;
+	desc?: TranslationString;
+}
+
+export type ResolvedText<T extends BasicTextData> = T & { name: string, desc: string, shortDesc: string };
+export type ResolvedAbilityText = ResolvedText<AbilityText>;
+export type ResolvedItemText = ResolvedText<ItemText>;
+export type ResolvedMoveText = ResolvedText<MoveText>;
+export type ResolvedNameText = { name: string };
+export type ResolvedTagText = { name: string, hint?: string, desc?: string };
+export type ResolvedSpeciesText = { name: string, baseSpecies: string, forme?: string, grammar?: string };
 
 export declare namespace RandomTeamsTypes {
 	export interface TeamDetails {
@@ -574,6 +621,8 @@ export declare namespace RandomTeamsTypes {
 		abilities?: string[];
 		teraTypes?: string[];
 		preferredTypes?: string[];
+		/** Allows for hardcoded items, currently only used by Pet Mods */
+		items?: string[];
 	}
 	export interface RandomSpeciesData {
 		level?: number;

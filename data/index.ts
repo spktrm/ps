@@ -30,6 +30,7 @@ import {
 const DEFAULT_EXISTS = (d: Data) => {
   if (!d.exists) return false;
   if ('isNonstandard' in d && d.isNonstandard) return false;
+  if (d.kind === 'Species' && d.placeholderFor) return false;
   if (d.kind === 'Ability' && d.id === 'noability') return false;
   return !('tier' in d && ['Illegal', 'Unreleased'].includes(d.tier));
 };
@@ -233,6 +234,7 @@ export class Specie implements DexSpecies {
   readonly shortDesc!: string;
   readonly desc!: string;
   readonly isNonstandard!: Nonstandard | null;
+  readonly placeholderFor?: string;
   readonly duration?: number;
 
   readonly effectType!: 'Pokemon';
@@ -322,8 +324,7 @@ export class Specie implements DexSpecies {
     if (!this.otherFormes?.length) this.otherFormes = undefined;
     this.formeOrder = species.formeOrder?.filter(s => exists(this.dex.species.get(s)));
     if (!this.formeOrder || this.formeOrder.length <= 1) this.formeOrder = undefined;
-    this.formes = this.formeOrder?.filter(s =>
-      this.dex.species.get(s).isNonstandard !== 'Gigantamax');
+    this.formes = this.formeOrder?.filter(s => !this.dex.species.get(s).placeholderFor);
     this.prevo =
       species.prevo && exists(this.dex.species.get(species.prevo)) ? species.prevo : undefined;
   }
@@ -332,7 +333,7 @@ export class Specie implements DexSpecies {
     return (this.baseSpecies === this.name
       ? this.formeOrder ? this.formeOrder.findIndex(name => name === this.name) : 0
       : this.dex.species.get(this.baseSpecies).formeOrder!.findIndex(
-        name => name === (this.isNonstandard === 'Gigantamax' ? this.baseSpecies : this.name)
+        name => name === (this.placeholderFor ? this.baseSpecies : this.name)
       ));
   }
 

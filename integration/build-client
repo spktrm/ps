@@ -1406,28 +1406,61 @@ process.stdout.write("Building `data/moves,items,abilities,typechart,learnsets.j
 
 {
 	const textData = Dex.loadTextData();
-	const Text = textData.Default;
+	const Text = {};
+	for (const key in textData.Default) {
+		// UI strings exist to support Pokémon Showdown's translation system and aren't battle text
+		if (key === 'ui') continue;
+		Text[key] = textData.Default[key];
+		// Stat names were moved from DefaultText to their own table but are still looked up by stat
+		if (key === 'default') {
+			for (const stat in textData.StatNames) {
+				Text[stat] = {statName: textData.StatNames[stat]};
+				if (textData.StatShortNames[stat]) Text[stat].statShortName = textData.StatShortNames[stat];
+			}
+		}
+	}
 
 	function assignData(id, entry) {
 		for (const key in entry) {
 			if (['name', 'desc', 'shortDesc'].includes(key)) continue;
 			const textEntry = Text[id] || (Text[id] = {});
-			if (key.startsWith('gen')) {
+			if (/^gen\d$/.test(key)) {
 				for (const modKey in entry[key]) {
-					if (['desc', 'shortDesc'].includes(key)) continue;
+					if (['desc', 'shortDesc'].includes(modKey)) continue;
 					textEntry[modKey + 'Gen' + key.charAt(3)] = entry[key][modKey];
 				}
-			} else {
+			} else if (typeof entry[key] !== 'object') {
+				// NB: other objects are mod-specific (eg. `champions`) descriptions which can be ignored
 				textEntry[key] = entry[key];
 			}
 		}
+		if (Text[id] && !Object.keys(Text[id]).length) delete Text[id];
 	}
 
 	for (const id in textData.Moves) assignData(id, textData.Moves[id]);
 	for (const id in textData.Abilities) assignData(id, textData.Abilities[id]);
 	for (const id in textData.Items) assignData(id, textData.Items[id]);
 
-	const buf = 'exports.BattleText = ' + es3stringify(Text) + ';';
+	// Pokémon Showdown reworked its text templates as part of its translation system, but the vendored
+	// smogon/pokemon-showdown-client still expects the original templates (see `import`)
+	const INFLECT = /\{([A-Z]+)\} \{INFLECT:\1:s=([^:}]*):p=([^:}]*)\}/g;
+	const INFLECTED = {plural: {STAT: textData.StatNames.stats}, singular: {NUMBER: '1'}};
+	const inflect = (s, n) => s.replace(INFLECT, (_, p, ...forms) =>
+		`${INFLECTED[n][p] || `{${p}}`} ${forms[+(n === 'plural')]}`);
+	for (const id in Text) {
+		for (const key in Text[id]) {
+			const template = Text[id][key];
+			if (typeof template !== 'string' || !template.includes('{INFLECT:')) continue;
+			Text[id][key] = inflect(template, 'plural');
+			Text[id][`${key}Singular`] = inflect(template, 'singular');
+		}
+	}
+	const compat = s => s
+		.replace('{PERCENTAGE}%', '{PERCENTAGE}')
+		.replace(/\{TRAINER[12]\}/g, '[TRAINER]')
+		.replace(/\{([A-Z][A-Z0-9]*)\}/g, '[$1]');
+	const converted = JSON.parse(JSON.stringify(Text, (_, v) => typeof v === 'string' ? compat(v) : v));
+	const buf = 'exports.BattleText = ' + es3stringify(converted) + ';';
 	fs.writeFileSync(path.join(psc, 'play.pokemonshowdown.com/data/text.js'), buf);
 }
 

@@ -45,6 +45,7 @@ export class BasicEffect<NameT extends string = string> implements T.BasicEffect
   shortDesc: string;
   desc: string;
   isNonstandard: T.Nonstandard | null;
+  placeholderFor?: string;
   duration?: number;
 
   constructor(data: AnyObject) {
@@ -427,6 +428,7 @@ export class Move extends BasicEffect<T.MoveName> implements T.Move {
     super(data);
     data = this;
 
+    if (data.placeholderFor) this.id = toID(data.placeholderFor); // Hidden Power hack
     this.fullname = `move: ${this.name}`;
     this.effectType = 'Move';
     this.kind = 'Move';

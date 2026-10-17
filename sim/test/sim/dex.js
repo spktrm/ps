@@ -85,7 +85,94 @@ describe('Dex#getMove', () => {
 	it(`should correctly handle G-Max moves`, () => {
 		assert.equal(Dex.forGen(8).moves.get('G-Max Befuddle').name, "G-Max Befuddle");
 		assert.equal(Dex.forGen(8).moves.get('G-Max Befuddle').gen, 8);
-		assert.equal(Dex.forGen(8).moves.get('G-Max Befuddle').isNonstandard, "Gigantamax");
+		assert.equal(Dex.forGen(8).moves.get('G-Max Befuddle').isMax, "Butterfree");
+	});
+});
+
+describe('DexText#get', () => {
+	// @pkmn/sim only includes English text, so all other languages fall back to English
+	it(`should fall back to English for other languages`, () => {
+		const pikachuText = Dex.loadTextData('ja').Pokedex.pikachu;
+		assert.deepEqual(pikachuText, {
+			name: 'Pikachu', baseSpecies: 'Pikachu',
+		});
+		assert.equal(Dex.text.get(Dex.species.get('Pikachu'), 'ja'), pikachuText);
+		assert.deepEqual(Dex.loadTextData('ja').Pokedex.unownb, {
+			name: 'Unown-B', baseSpecies: 'Unown', forme: 'B',
+		});
+		assert.equal(Dex.text.get(Dex.items.get('Leftovers'), 'ja').name, 'Leftovers');
+		assert.equal(Dex.text.get(Dex.abilities.get('Levitate'), 'ja').name, 'Levitate');
+		assert.equal(Dex.text.get(Dex.moves.get('Tackle'), 'ja').name, 'Tackle');
+	});
+
+	it(`should provide names backed by Dex objects`, () => {
+		const {Tags} = require('../../build/cjs/data/tags');
+		assert.deepEqual(Dex.text.get(Dex.types.get('Fire')), {name: 'Fire'});
+		assert.deepEqual(Dex.text.get(Dex.natures.get('Adamant')), {name: 'Adamant'});
+		assert.deepEqual(Dex.text.get(Tags.restrictedlegendary), {name: 'Restricted Legendary'});
+	});
+
+	it(`should provide scalar names`, () => {
+		assert.equal(Dex.loadTextData().StatNames.stats, 'stats');
+		assert.equal(Dex.loadTextData().StatNames.spd, 'Sp. Def');
+		assert.equal(Dex.loadTextData().StatMediumNames.spd, 'Sp. Def');
+		assert.equal(Dex.loadTextData().StatShortNames.spd, 'SpD');
+		const {Tags} = require('../../build/cjs/data/tags');
+		assert.equal(Dex.text.get(Tags.physical).name, 'Physical');
+		assert.equal(Dex.loadTextData().GenderNames.F, 'Female');
+		assert.equal(Dex.loadTextData().ColorNames.Purple, 'Purple');
+	});
+
+	it(`should return the entire text entry`, () => {
+		assert.equal(
+			Dex.text.get(Dex.moves.get('Absorb')).gen4.desc,
+			'The user recovers 1/2 the HP lost by the target, rounded down. If Big Root is held by the user, ' +
+			'the HP recovered is 1.3× normal, rounded down.'
+		);
+	});
+
+	it(`should fall back to English text data`, () => {
+		const move = Dex.moves.get('Tackle');
+		const englishText = Dex.text.get(move, 'en');
+		assert.deepEqual(Dex.text.get(move, 'en-afd'), englishText);
+		assert.deepEqual(Dex.text.get(move), englishText);
+		assert.deepEqual(Dex.loadTextData('en-afd').Moves.tackle, Dex.loadTextData('en').Moves.tackle);
+	});
+
+	it(`should keep long and short description fallbacks separate`, () => {
+		const text = Dex.text.get(Dex.moves.get('Close Combat'));
+		assert.notEqual(text.desc, text.shortDesc);
+	});
+
+	it(`should use an old-generation description instead of the current-generation description`, () => {
+		const dex = Dex.forGen(4);
+		const move = dex.moves.get('Brick Break');
+		const desc = Dex.loadTextFile('moves', 'MovesText').brickbreak.gen4.desc;
+		assert.equal(dex.loadTextData().Moves.brickbreak.desc, desc);
+		assert.equal(dex.text.get(move).desc, desc);
+		assert.notEqual(desc, Dex.loadTextData().Moves.brickbreak.desc);
+	});
+
+	it(`should use English-only descriptions defined by mods`, () => {
+		const dex = Dex.mod('gen3');
+		const move = {...dex.moves.get('Tackle'), shortDesc: 'A mod-specific description.'};
+		assert.equal(dex.text.get(move, 'ja').shortDesc, move.shortDesc);
+	});
+});
+
+describe('Dex#isTagged', () => {
+	it(`should check species, move, and generic tags`, () => {
+		assert(Dex.isTagged(Dex.species.get('Mew'), 'Mythical'));
+		assert(Dex.isTagged(Dex.species.get('Charizard-Gmax'), 'Gigantamax'));
+		assert(Dex.isTagged(Dex.moves.get('Tackle'), 'Contact'));
+		assert(Dex.isTagged(Dex.moves.get('Shadow Strike'), 'CAP'));
+		assert(Dex.isTagged(Dex.moves.get('Light of Ruin'), 'Past Unobtainable'));
+		assert(Dex.isTagged(Dex.items.get('Berserk Gene'), 'True Past'));
+
+		assert.false(Dex.isTagged(Dex.species.get('Charizard'), 'Gigantamax'));
+		assert.false(Dex.isTagged(Dex.moves.get('Confusion'), 'Contact'));
+		assert.false(Dex.isTagged(Dex.abilities.get('Pressure'), 'Mythical'));
+		assert.false(Dex.isTagged(Dex.species.get('Pikachu'), 'definitely not a real tag'));
 	});
 });
 

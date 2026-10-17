@@ -39,6 +39,8 @@ export interface EffectData {
   desc?: string;
   effectType?: EffectType;
   isNonstandard?: Nonstandard | null;
+  /** For typed Hidden Powers and Gigantamax formes - the move/species this is a placeholder for */
+  placeholderFor?: string;
   shortDesc?: string;
   inherit?: boolean;
   duration?: number;
