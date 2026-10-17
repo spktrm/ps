@@ -113,6 +113,8 @@ const IMPORTS = {
   'sim/dex-data.ts': [
     'AnyObject', 'ID', 'SparseStatsTable', 'EffectType', 'Nonstandard',
     'EffectData', 'StatIDExceptHP', 'ModdedDex', 'StatID', 'IDEntry',
+    'TableTag', 'Species', 'Item', 'Ability', 'Move', 'ResolvedAbilityText', 'ResolvedItemText',
+    'ResolvedMoveText', 'ResolvedNameText', 'ResolvedSpeciesText',
   ],
   'sim/dex-items.ts': [
     'AnyObject', 'Battle', 'Pokemon', 'SparseBoostsTable', 'CommonHandlers', 'ModdedDex', 'ID',
@@ -130,14 +132,14 @@ const IMPORTS = {
   ],
   'sim/side.ts': [
     'AnyObject', 'Effect', 'ActiveMove', 'Condition', 'PokemonSet', 'Battle',
-    'StatsExceptHPTable', 'MoveTarget', 'Move', 'SideID', 'ID',
+    'StatsExceptHPTable', 'MoveTarget', 'SideID', 'ID',
   ],
   'sim/state.ts': [
     'AnyObject', 'Condition', 'Ability', 'Item', 'Move', 'Species', 'ActiveMove',
   ],
   'sim/team-validator.ts': [
     'Format', 'StatsTable', 'SparseStatsTable', 'Species', 'AnyObject', 'Move',
-    'EventInfo', 'PokemonSet', 'Ability', 'Item', 'ID', 'ModdedDex', 'Nature',
+    'EventInfo', 'PokemonSet', 'Ability', 'Item', 'ID', 'ModdedDex', 'Nature', 'TypeInfo',
   ],
   'sim/tools/random-player-ai.ts': ['AnyObject'],
   'sim/tools/runner.ts': ['PokemonSet'],
@@ -182,6 +184,7 @@ const MOD_IMPORTS = {
   'data/mods/gen3rs/formats-data.ts': ['ModdedSpeciesFormatsDataTable'],
   'data/mods/gen3rs/items.ts': ['ModdedItemDataTable'],
   'data/mods/gen3rs/learnsets.ts': ['ModdedLearnsetDataTable'],
+  'data/mods/gen3rs/rulesets.ts': ['ModdedFormatDataTable'],
   'data/mods/gen3rs/scripts.ts': ['ModdedBattleScriptsData'],
 
   // gen4pt
@@ -252,15 +255,17 @@ const MOD_IMPORTS = {
   'data/mods/champions/items.ts': ['ModdedItemDataTable', 'Pokemon'],
   'data/mods/champions/learnsets.ts': ['ModdedLearnsetDataTable'],
   'data/mods/champions/moves.ts': ['ModdedMoveDataTable', 'Move', 'ActiveMove'],
-  'data/mods/champions/rulesets.ts': ['ModdedFormatDataTable'],
+  'data/mods/champions/rulesets.ts': ['ModdedFormatDataTable', 'Item', 'Species'],
   'data/mods/champions/scripts.ts': [
     'ModdedBattleScriptsData', 'Pokemon', 'ActiveMove', 'toID', 'Condition',
   ],
 
-  // championsregma
-  'data/mods/championsregma/formats-data.ts': ['ModdedSpeciesFormatsDataTable'],
-  'data/mods/championsregma/items.ts': ['ModdedItemDataTable'],
-  'data/mods/championsregma/scripts.ts': ['ModdedBattleScriptsData'],
+  // championsregmb
+  'data/mods/championsregmb/formats-data.ts': ['ModdedSpeciesFormatsDataTable'],
+  'data/mods/championsregmb/items.ts': ['ModdedItemDataTable'],
+  'data/mods/championsregmb/learnsets.ts': ['ModdedLearnsetDataTable'],
+  'data/mods/championsregmb/moves.ts': ['ModdedMoveDataTable'],
+  'data/mods/championsregmb/scripts.ts': ['ModdedBattleScriptsData'],
 };
 const RANDOMS_IMPORTS = {
   'data/random-battles/gen9/teams.ts': [
@@ -365,7 +370,11 @@ const REWRITES = {
     '\tgetDetails = () => {':
       '\tgetDetails = (): {side: SideID, secret: string, shared: string} => {',
   },
+  // Pokémon Showdown no longer includes descriptions on effects (they must be looked up via
+  // `Dex#text`) but @pkmn/sim continues to include them for compatibility with @pkmn/dex
   'sim/dex-abilities.ts': {
+    '\t\t\t\t...abilityData,':
+      "\t\t\t\t...abilityData,\n\t\t\t\t...this.dex.getDescs('Abilities', id, abilityData),",
     '\t\tif (ability.exists) this.abilityCache.set(id, this.dex.deepFreeze(ability));':
       `\t\tif (!(ability as any).kind) (ability as any).kind = 'Ability';\n` +
       '\t\tif (ability.exists) this.abilityCache.set(id, ability);',
@@ -385,16 +394,33 @@ const REWRITES = {
     [KEY]: VALUE,
   },
   'sim/dex-items.ts': {
+    '\t\t\t\t...itemData,':
+      "\t\t\t\t...itemData,\n\t\t\t\t...this.dex.getDescs('Items', id, itemData),",
+    '\t\t\t\t\tif (item.isNonstandard === parentItem.isNonstandard) {':
+      '\t\t\t\t\tif (\n\t\t\t\t\t\titem.isNonstandard === parentItem.isNonstandard &&\n' +
+      '\t\t\t\t\t\titem.desc === parentItem.desc && item.shortDesc === parentItem.shortDesc\n' +
+      '\t\t\t\t\t) {',
     '\t\tif (item.exists) this.itemCache.set(id, this.dex.deepFreeze(item));':
       `\t\t(item as any).kind = 'Item';\n` +
       '\t\tif (item.exists) this.itemCache.set(id, item);',
   },
   'sim/dex-moves.ts': {
+    '\t\t\t\t...moveData,':
+      "\t\t\t\t...moveData,\n\t\t\t\t...this.dex.getDescs('Moves', id, moveData),",
+    '\t\t\t\t\tif (move.isNonstandard === parentMove.isNonstandard) {':
+      '\t\t\t\t\tif (\n\t\t\t\t\t\tmove.isNonstandard === parentMove.isNonstandard &&\n' +
+      '\t\t\t\t\t\tmove.desc === parentMove.desc && move.shortDesc === parentMove.shortDesc\n' +
+      '\t\t\t\t\t) {',
     '\t\tif (move.exists) this.moveCache.set(id, this.dex.deepFreeze(move));':
       `\t\t(move as any).kind = 'Move';\n` +
       '\t\tif (move.exists) this.moveCache.set(id, move);',
   },
   'sim/dex-data.ts': {
+    '\tisNonstandard: Nonstandard | null;':
+      '\t/**\n\t * A shortened form of the description of this effect.\n' +
+      '\t * Not all effects have this.\n\t */\n\tdeclare shortDesc: string;\n' +
+      '\t/** The full description for this effect. */\n\tdeclare desc: string;\n' +
+      '\tisNonstandard: Nonstandard | null;',
     '\t\tif (nature.exists) this.natureCache.set(id, this.dex.deepFreeze(nature));':
       `\t\t(nature as any).kind = 'Nature';\n` +
       '\t\tif (nature.exists) this.natureCache.set(id, nature);',
@@ -498,14 +524,19 @@ const OVERRIDDEN = new Set([
   'pnpm-debug.log', // sigh...
   'README.md',
   'sim/dex-formats.ts',
+  // Pokémon Showdown's version dynamically requires text for every language from data/text/ -
+  // @pkmn/sim instead statically includes only the English text to remain browser-friendly
+  'sim/dex-text.ts',
   'sim/exported-global-types.ts',
   'sim/index.ts',
   'sim/teams.ts',
   'sim/tools/exhaustive-runner.ts',
   'sim/tools/index.ts',
   'test/main.js',
+  'test/sim/dex.js',
   'test/sim/rulesets.js',
   'test/sim/team-validator/basic.js',
+  'test/sim/team-validator/events.js', // gen5bw1 is only available via @pkmn/mods
   'test/sim/team-validator/formes.js',
   'tsconfig.json',
 ]);
@@ -524,11 +555,12 @@ const MOD_OVERRIDDEN = new Set([
   'data/mods/gen9predlc/index.ts',
   'data/mods/gen9dlc1/index.ts',
   'data/mods/champions/index.ts',
-  'data/mods/championsregma/index.ts',
+  'data/mods/championsregmb/index.ts',
   'data/mods/index.test.ts',
   'data/mods/index.ts',
 ]);
 const SKIP_TESTS = new Set([
+  'test/sim/champions.js', // the champions mod is only available via @pkmn/mods
   'test/sim/data.js',
   'test/sim/misc/megaevolution.js',
   'test/sim/misc/statuses.js',
@@ -839,10 +871,12 @@ const changes = async (where, last, now, repo) => ({
             ' as any;\n/* eslint-enable */';
           // i fucking hate this bullshit
           data = path.resolve(path.join(ps, file), '..', `sets-megainvasion.json`);
-          raw = fs.readFileSync(data, 'utf8');
-          megaJson = '\n\n/* eslint-disable */\n' +
-            `const randomMegaInvasionSetsJSON = ${JSON.stringify(JSON.parse(raw))}` +
-            ' as any;\n/* eslint-enable */';
+          if (fs.existsSync(data)) {
+            raw = fs.readFileSync(data, 'utf8');
+            megaJson = '\n\n/* eslint-disable */\n' +
+              `const randomMegaInvasionSetsJSON = ${JSON.stringify(JSON.parse(raw))}` +
+              ' as any;\n/* eslint-enable */';
+          }
         }
       }
 
@@ -879,8 +913,11 @@ const changes = async (where, last, now, repo) => ({
     }
 
     const DefaultText = require(path.resolve(ps, 'dist/data/text/default.js')).DefaultText;
+    const Names = require(path.resolve(ps, 'dist/data/text/names.js'));
     const TEXT = {};
     for (const key in DefaultText) {
+      // UI strings exist to support Pokémon Showdown's translation system and aren't battle text
+      if (key === 'ui') continue;
       if (key === 'sandstorm') {
         DefaultText[key].weatherName = 'Sand';
       } else if (key === 'desolateland') {
@@ -888,6 +925,13 @@ const changes = async (where, last, now, repo) => ({
       }
 
       TEXT[key === 'default' ? '_' : key] = DefaultText[key];
+      // Stat names were moved from DefaultText to their own table but are still looked up by stat
+      if (key === 'default') {
+        for (const stat in Names.StatNames) {
+          TEXT[stat] = {statName: Names.StatNames[stat]};
+          if (Names.StatShortNames[stat]) TEXT[stat].statShortName = Names.StatShortNames[stat];
+        }
+      }
     }
     for (const text in TEXTS) {
       for (const id in TEXTS[text]) {
@@ -895,23 +939,70 @@ const changes = async (where, last, now, repo) => ({
         for (const key in entry) {
           if (['name', 'desc', 'shortDesc'].includes(key)) continue;
           TEXT[id] = TEXT[id] || {};
-          if (key.startsWith('gen')) {
+          if (/^gen\d$/.test(key)) {
             for (const modKey in entry[key]) {
               if (['desc', 'shortDesc'].includes(modKey)) continue;
               TEXT[id][modKey + 'Gen' + key.charAt(3)] = entry[key][modKey];
             }
-          } else {
+          } else if (typeof entry[key] !== 'object') {
+            // NB: other objects are mod-specific (eg. `champions`) descriptions and can be ignored
             TEXT[id][key] = entry[key];
           }
         }
         if (TEXT[id] && !Object.keys(TEXT[id]).length) delete TEXT[id];
       }
     }
-    fs.writeFileSync(path.join(view, 'src/data/text.json'), stringify(TEXT));
+    // Pokémon Showdown reworked its text templates as part of its translation system, but
+    // @pkmn/view's BattleTextParser still expects the original templates. Templates which use
+    // `{INFLECT:...}` need to be expanded back into separate plural and `*Singular` templates,
+    // percentages are already formatted with a '%', and `{PLACEHOLDER}`s were previously
+    // `[PLACEHOLDER]`s (with `{TRAINER1}`/`{TRAINER2}` being the previously repeated `[TRAINER]`)
+    const INFLECT = /\{([A-Z]+)\} \{INFLECT:\1:s=([^:}]*):p=([^:}]*)\}/g;
+    const INFLECTED = {plural: {STAT: Names.StatNames.stats}, singular: {NUMBER: '1'}};
+    const inflect = (s, n) => s.replace(INFLECT, (_, p, ...forms) =>
+      `${INFLECTED[n][p] || `{${p}}`} ${forms[+(n === 'plural')]}`);
+    for (const id in TEXT) {
+      for (const key in TEXT[id]) {
+        const template = TEXT[id][key];
+        if (typeof template !== 'string' || !template.includes('{INFLECT:')) continue;
+        TEXT[id][key] = inflect(template, 'plural');
+        TEXT[id][`${key}Singular`] = inflect(template, 'singular');
+      }
+    }
+    const compat = s => s
+      .replace('{PERCENTAGE}%', '{PERCENTAGE}')
+      .replace(/\{TRAINER[12]\}/g, '[TRAINER]')
+      .replace(/\{([A-Z][A-Z0-9]*)\}/g, '[$1]');
+    const compatible = JSON.stringify(TEXT, (_, v) => typeof v === 'string' ? compat(v) : v);
+    fs.writeFileSync(path.join(view, 'src/data/text.json'), stringify(JSON.parse(compatible)));
 
     for (const basename in DEX) {
       const data = basename === 'aliases.json' ? DEX[basename][9] : DEX[basename];
       fs.writeFileSync(path.join(dex, 'data', basename), stringify(data));
+    }
+
+    // Pokémon Showdown moved mod-specific descriptions out of the mods' data and into data/text/
+    // (keyed by the mod's ID), but @pkmn/dex can only make use of descriptions in the mod's data
+    for (const [basename, text] of Object.entries(TEXTS)) {
+      for (const mod of fs.readdirSync(path.join(mods, 'src'))) {
+        const file = path.join(mods, 'src', mod, basename.replace('.json', '.ts'));
+        let source = null;
+        for (const id in text) {
+          const descs = text[id][mod];
+          if (!descs) continue;
+          if (!source) {
+            if (!fs.existsSync(file)) throw new Error(`Missing ${file} for ${mod} text`);
+            source = fs.readFileSync(file, 'utf8');
+          }
+          const lines = ['desc', 'shortDesc'].filter(k => descs[k])
+            .map(k => `\t\t${k}: ${JSON.stringify(descs[k])},\n`).join('');
+          const entry = new RegExp(`^\\t${id}: \\{\\n(\\t\\tinherit: true,\\n)?`, 'm');
+          source = entry.test(source)
+            ? source.replace(entry, m => m + lines)
+            : source.replace(/\n};\n$/, `\n\t${id}: {\n\t\tinherit: true,\n${lines}\t},\n};\n`);
+        }
+        if (source) fs.writeFileSync(file, source);
+      }
     }
 
     const inspect = s =>
@@ -930,12 +1021,16 @@ const changes = async (where, last, now, repo) => ({
     const skip = [
       '[Gen 5] Almost Any Ability',
       '[Gen 7] Balanced Hackmons',
+      '[Gen 8] Balanced Hackmons',
+      '[Gen 9] AAA Draft',
       '[Gen 9] AAA UU',
+      '[Gen 9] Chimera 1v1 Random Battle (Bo5)',
       '[Gen 9] National Dex Godly Gift',
       '[Gen 9] National Dex AAA',
       '[Gen 9] National Dex STABmons',
       '[Gen 9] Legends Z-A OU',
       '[Gen 9] Monocolor',
+      '[Gen 9] National Dex Monoletter',
       '[Gen 9] Godly Gift VG 2024 Reg G (Bo3)',
     ];
     for (const format of require(path.resolve(ps, 'dist/config/formats.js')).Formats) {

@@ -194,7 +194,7 @@ describe('Dex', () => {
       expect(Dex.moves.get('Feint').breaksProtect).toBe(true);
       expect(Dex.moves.get('Sacred Sword').ignoreDefensive).toBe(true);
       expect(Dex.moves.get('Fissure').ohko).toBe(true);
-      expect(Dex.forGen(8).moves.get('G-Max Befuddle').isNonstandard).toBe('Gigantamax');
+      expect(Dex.forGen(8).moves.get('G-Max Befuddle').isNonstandard).toBe('Gmax');
 
       // self
       expect(Dex.moves.get('Petal Dance').self!.volatileStatus).toBe('lockedmove');
@@ -275,7 +275,7 @@ describe('Dex', () => {
         for (const id in dex.data.Species) {
           const s = dex.species.get(id);
           if (!s.exists || s.tier === 'Illegal' || s.isNonstandard) continue;
-          if (s.isCosmeticForme) continue;
+          if (s.isCosmeticForme || s.placeholderFor) continue;
           if (s.name !== s.baseSpecies) {
             count.formes++;
           } else {
