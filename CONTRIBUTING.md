@@ -58,8 +58,9 @@ function bump() {
 #### `link`
 
 During development it is desirable to depend directly on internal packages as opposed to their
-publically published versions. `subpkg` provides a '`link`' subcommand that can be run after
-installation to point the internal packages at local versions instead of the published releases:
+publically published versions. `subpkg` provides a '`link`' subcommand which points the internal
+packages at local versions instead of the published releases. `npm install` runs it automatically,
+but it needs to be rerun after installing within an individual sub-package:
 
 ```sh
 $ subpkg link

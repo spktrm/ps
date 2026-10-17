@@ -12,6 +12,4 @@ jobs:
       with:
         submodules: true
     - run: npm install
-    # Test the internal packages against each other instead of their published releases
-    - run: npx subpkg link
     - run: npm run test:integration
