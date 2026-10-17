@@ -10,7 +10,7 @@ import {
 } from './exported-global-types';
 
 import type { PokemonEventMethods, ConditionData, ModdedConditionData } from './dex-conditions';
-import { assignMissingFields, BasicEffect, toID } from './dex-data';
+import { assignMissingFields, BasicEffect, toID, type ModdedEffectText } from './dex-data';
 import { Utils } from '../lib/utils';
 
 interface FlingData {
@@ -24,12 +24,12 @@ export interface ItemData extends Partial<Item>, PokemonEventMethods {
 	name: string;
 }
 
-export type ModdedItemData = ItemData | Partial<Omit<ItemData, 'name'>> & {
+export type ModdedItemData = (ItemData | Partial<Omit<ItemData, 'name'>> & {
 	inherit: true,
 	onCustap?: (this: Battle, pokemon: Pokemon) => void,
 	onWhiteHerb?: (this: Battle, pokemon: Pokemon) => void,
 	condition?: ModdedConditionData,
-};
+}) & ModdedEffectText;
 
 export interface ItemDataTable { [itemid: IDEntry]: ItemData }
 export interface ModdedItemDataTable { [itemid: IDEntry]: ModdedItemData }
@@ -199,11 +199,10 @@ export class DexItems {
 		}
 		if (id && this.dex.data.Items.hasOwnProperty(id)) {
 			const itemData = this.dex.data.Items[id] as any;
-			const itemTextData = this.dex.getDescs('Items', id, itemData);
 			item = new Item({
 				name: id,
 				...itemData,
-				...itemTextData,
+				...this.dex.getDescs('Items', id, itemData),
 			});
 			if (item.gen > this.dex.gen) {
 				(item as any).isNonstandard = 'Future';
@@ -215,8 +214,7 @@ export class DexItems {
 					const parentItem = parent.items.getByID(id);
 					if (
 						item.isNonstandard === parentItem.isNonstandard &&
-						item.desc === parentItem.desc &&
-						item.shortDesc === parentItem.shortDesc
+						item.desc === parentItem.desc && item.shortDesc === parentItem.shortDesc
 					) {
 						item = parentItem;
 					}

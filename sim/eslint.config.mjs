@@ -5,6 +5,7 @@ export default [...pkmn, {
 }, {
   rules: {
     "arrow-body-style": "off",
+    "curly": "off",
     "@stylistic/array-bracket-spacing": "off",
     "@stylistic/comma-dangle": "off",
     "@stylistic/indent": "off",
@@ -18,6 +19,7 @@ export default [...pkmn, {
     "@stylistic/operator-linebreak": "off",
     "@stylistic/quotes": "off",
     "@stylistic/spaced-comment": "off",
+    "@typescript-eslint/consistent-type-definitions": "off",
     "@typescript-eslint/no-base-to-string": "off",
     "@typescript-eslint/no-floating-promises": "off",
     "@typescript-eslint/no-redundant-type-constituents": "off",

@@ -1,4 +1,4 @@
-import type {ModdedFormatDataTable} from '@pkmn/sim';
+import type {Item, ModdedFormatDataTable, Species} from '@pkmn/sim';
 
 export const Rulesets: ModdedFormatDataTable = {
 	standardag: {
@@ -62,5 +62,14 @@ export const Rulesets: ModdedFormatDataTable = {
 			this.add('rule', "Level Clause Mod: Pokémon levels are not fixed at 50, with stats calculated accordingly.");
 		},
 		// Implemented in mods/champions/scripts.ts
+	},
+	natdexmod: {
+		effectType: 'ValidatorRule',
+		name: 'NatDex Mod',
+		desc: "Mechanics for National Dex formats",
+		ruleset: [
+			'+Unobtainable', '+Past', 'Sketch Post-Gen 7 Moves',
+		],
+		// implemented in the champions natdex draft format
 	},
 };

@@ -157,16 +157,21 @@ for (const [pkg, Dex] of Object.entries(DATA)) {
         expect(dex.gen).toBe(9);
         expect(dex.species.get('Incineroar').isNonstandard).toBeNull();
         expect(dex.species.get('Koraidon').isNonstandard).toBe('Past');
+        expect(dex.species.get('Salamence').isNonstandard).toBeNull();
+        expect(dex.items.get('Eject Button').isNonstandard).toBeNull();
         expectFormat(dex, 'gen9championsou');
+        expectFormat(dex, 'gen9championsvgc2026regmc');
       });
-      it('championsregma', async () => {
+      it('championsregmb', async () => {
+        const champions = Dex.mod('champions' as ID, await import('./champions') as ModData);
         const dex =
-          new ModdedDex(Dex.mod('championsregma' as ID,
-            await import('./championsregma') as ModData));
+          new ModdedDex(champions.mod('championsregmb' as ID,
+            await import('./championsregmb') as ModData));
         expect(dex.gen).toBe(9);
-        expect(dex.species.get('Venusaur').isNonstandard).toBeNull();
-        expect(dex.items.get('Life Orb').isNonstandard).toBe('Past');
-        expectFormat(dex, 'gen9championsvgc2026regma');
+        expect(dex.species.get('Incineroar').isNonstandard).toBeNull();
+        expect(dex.species.get('Salamence').isNonstandard).toBe('Past');
+        expect(dex.items.get('Eject Button').isNonstandard).toBe('Past');
+        expectFormat(dex, 'gen9championsvgc2026regmb');
       });
     });
 
