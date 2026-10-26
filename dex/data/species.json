@@ -26854,7 +26854,7 @@
       "tags": ["Sub-Legendary"],
       "prevo": "Kubfu",
       "evoType": "other",
-      "evoCondition": "Defeat the Single Strike Tower",
+      "evoCondition": "Use a Scroll of Darkness",
       "eggGroups": ["Undiscovered"],
       "otherFormes": ["Urshifu-Rapid-Strike"],
       "formeOrder": ["Urshifu", "Urshifu-Rapid-Strike"],
@@ -26879,7 +26879,7 @@
       "weightkg": 105,
       "prevo": "Kubfu",
       "evoType": "other",
-      "evoCondition": "Defeat the Rapid Strike Tower",
+      "evoCondition": "Use a Scroll of Waters",
       "eggGroups": ["Undiscovered"],
       "canGigantamax": "G-Max Rapid Flow"
     },
@@ -27132,7 +27132,8 @@
       "weightkg": 89,
       "prevo": "Scyther",
       "evoType": "useItem",
-      "evoCondition": "Black Augurite",
+      "evoItem": "Black Augurite",
+      "evoCondition": "in Legends: Arceus or Legends: Z-A",
       "eggGroups": ["Bug"]
     },
     "ursaluna": {
@@ -27150,8 +27151,9 @@
       "abilities": {"0": "Guts", "1": "Bulletproof", "H": "Unnerve"},
       "weightkg": 290,
       "prevo": "Ursaring",
-      "evoType": "other",
-      "evoCondition": "Peat Block when there's a full moon",
+      "evoType": "useItem",
+      "evoItem": "Peat Block",
+      "evoCondition": "in Legends: Arceus when there's a full moon",
       "eggGroups": ["Field"],
       "otherFormes": ["Ursaluna-Bloodmoon"],
       "formeOrder": ["Ursaluna", "Ursaluna-Bloodmoon"]

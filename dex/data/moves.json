@@ -510,6 +510,11 @@
       "condition": {"inherit": true, "onAfterMoveSelfPriority": 0},
       "desc": "If the user is not a Ghost type, lowers the user's Speed by 1 stage and raises the user's Attack and Defense by 1 stage, unless the user's Attack and Defense stats are both at stage 6. If the user is a Ghost type, the user loses 1/2 of its maximum HP, rounded down and even if it would cause fainting, in exchange for the target losing 1/4 of its maximum HP, rounded down, at the end of each turn while it is active. If the target uses Baton Pass, the replacement will continue to be affected. Fails if the target is already affected or has a substitute."
     },
+    "destinybond": {
+      "inherit": true,
+      "condition": {"inherit": true},
+      "desc": "Until the user's next turn, if an opposing Pokemon's attack knocks the user out, that Pokemon faints as well."
+    },
     "detect": {
       "inherit": true,
       "priority": 2,
@@ -854,10 +859,6 @@
     "defensecurl": {
       "inherit": true,
       "desc": "Raises the user's Defense by 1 stage. While the user remains active, the power of the user's Rollout will be doubled (this effect is not stackable). Baton Pass can be used to transfer this effect to an ally."
-    },
-    "destinybond": {
-      "inherit": true,
-      "desc": "Until the user's next turn, if an opposing Pokemon's attack knocks the user out, that Pokemon faints as well."
     },
     "disable": {
       "inherit": true,
@@ -1882,7 +1883,7 @@
     "healingwish": {
       "inherit": true,
       "flags": {"heal": 1, "metronome": 1},
-      "condition": {"duration": 1, "onSwitchInPriority": -1},
+      "condition": {"duration": 1, "onEntryHazardPriority": -1},
       "desc": "The user faints and the Pokemon brought out to replace it has its HP fully restored along with having any non-volatile status condition cured. The new Pokemon is sent out immediately and the healing happens after hazards take effect. Fails if the user is the last unfainted Pokemon in its party."
     },
     "highjumpkick": {
@@ -1950,7 +1951,7 @@
     "lunardance": {
       "inherit": true,
       "flags": {"heal": 1, "metronome": 1},
-      "condition": {"duration": 1, "onSwitchInPriority": -1},
+      "condition": {"duration": 1, "onEntryHazardPriority": -1},
       "desc": "The user faints and the Pokemon brought out to replace it has its HP and PP fully restored along with having any non-volatile status condition cured. The new Pokemon is sent out immediately and the healing happens after hazards take effect. Fails if the user is the last unfainted Pokemon in its party."
     },
     "magiccoat": {
@@ -2185,7 +2186,7 @@
     "spikes": {
       "inherit": true,
       "flags": {"metronome": 1, "mustpressure": 1},
-      "condition": {"inherit": true}
+      "condition": {"inherit": true, "onEntryHazardPriority": 2}
     },
     "spite": {
       "inherit": true,
@@ -2194,7 +2195,7 @@
     "stealthrock": {
       "inherit": true,
       "flags": {"metronome": 1, "mustpressure": 1},
-      "condition": {"inherit": true}
+      "condition": {"inherit": true, "onEntryHazardPriority": 1}
     },
     "struggle": {
       "inherit": true,
@@ -2263,7 +2264,7 @@
     "toxicspikes": {
       "inherit": true,
       "flags": {"metronome": 1, "mustpressure": 1},
-      "condition": {"inherit": true},
+      "condition": {"inherit": true, "onEntryHazardPriority": 3},
       "desc": "Sets up a hazard on the opposing side of the field, poisoning each opposing Pokemon that switches in, unless it is a Flying-type Pokemon or has the Levitate Ability. Can be used up to two times before failing. Opposing Pokemon become poisoned with one layer and badly poisoned with two layers. Can be removed from the opposing side if any opposing Pokemon uses Rapid Spin successfully, is hit by Defog, or a grounded Poison-type Pokemon switches in. Safeguard prevents the opposing party from being poisoned on switch-in, as well as switching in with a substitute."
     },
     "transform": {

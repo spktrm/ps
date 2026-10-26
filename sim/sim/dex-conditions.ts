@@ -34,6 +34,7 @@ export interface EventMethods {
 	onAfterMega?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
+	onAfterEntryHazard?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterTerastallization?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -469,6 +470,7 @@ export interface EventMethods {
 	onDragOutPriority?: number;
 	onDisableMovePriority?: number;
 	onEffectivenessPriority?: number;
+	onEntryHazardPriority?: number;
 	onFoeBasePowerPriority?: number;
 	onFoeBeforeMovePriority?: number;
 	onFoeModifyDefPriority?: number;

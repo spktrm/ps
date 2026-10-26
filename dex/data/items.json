@@ -382,6 +382,7 @@
       "onResidualSubOrder": 20
     },
     "toxicplate": {"inherit": true, "onTakeItem": true},
+    "whiteherb": {"inherit": true},
     "widelens": {"inherit": true, "onSourceModifyAccuracyPriority": 4},
     "zapplate": {"inherit": true, "onTakeItem": true},
     "zoomlens": {"inherit": true, "onSourceModifyAccuracyPriority": 4}
@@ -1463,6 +1464,13 @@
       "gen": 5,
       "shortDesc": "Holder's partial-trapping moves deal 1/6 max HP per turn instead of 1/8."
     },
+    "blackaugurite": {
+      "name": "Black Augurite",
+      "num": 1691,
+      "gen": 8,
+      "isNonstandard": "Legends",
+      "shortDesc": "Evolves Scyther into Kleavor when used."
+    },
     "blackbelt": {
       "name": "Black Belt",
       "fling": {"basePower": 30},
@@ -1487,6 +1495,13 @@
       "num": 281,
       "gen": 4,
       "shortDesc": "Each turn, if holder is a Poison type, restores 1/16 max HP; loses 1/8 if not."
+    },
+    "blankplate": {
+      "name": "Blank Plate",
+      "num": 1780,
+      "gen": 8,
+      "isNonstandard": "Legends",
+      "shortDesc": "Changes Arceus to the Normal type when used in Legends: Arceus."
     },
     "blastoisinite": {
       "name": "Blastoisinite",
@@ -3179,6 +3194,14 @@
       "gen": 2,
       "shortDesc": "At the end of every turn, holder restores 1/16 of its max HP."
     },
+    "legendplate": {
+      "name": "Legend Plate",
+      "num": 1828,
+      "gen": 8,
+      "isNonstandard": "Legends",
+      "desc": "When used on Arceus in Legends: Arceus, changes it to the Normal type. When Arceus uses Judgment, Arceus and the move change to a type that is most effective against the target.",
+      "shortDesc": "In Legends: Arceus, Arceus's Judgment changes type to be supereffective."
+    },
     "leppaberry": {
       "name": "Leppa Berry",
       "isBerry": true,
@@ -3840,6 +3863,13 @@
       "num": 193,
       "gen": 4,
       "shortDesc": "Halves damage taken from a supereffective Psychic-type attack. Single use."
+    },
+    "peatblock": {
+      "name": "Peat Block",
+      "num": 1692,
+      "gen": 8,
+      "isNonstandard": "Legends",
+      "shortDesc": "Evolves Ursaring into Ursaluna when used during a full moon."
     },
     "pechaberry": {
       "name": "Pecha Berry",

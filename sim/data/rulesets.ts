@@ -627,19 +627,10 @@ export const Rulesets: import('../sim/dex-formats').FormatDataTable = {
 	ohkoclause: {
 		effectType: 'ValidatorRule',
 		name: 'OHKO Clause',
-		desc: "Bans all OHKO moves, such as Fissure",
+		desc: "Bans all OHKO moves",
+		banlist: ['Fissure', 'Guillotine', 'Horn Drill', 'Sheer Cold'],
 		onBegin() {
 			this.add('rule', 'OHKO Clause: OHKO moves are banned');
-		},
-		onValidateSet(set) {
-			const problems: string[] = [];
-			if (set.moves) {
-				for (const moveId of set.moves) {
-					const move = this.dex.moves.get(moveId);
-					if (move.ohko) problems.push(move.name + ' is banned by OHKO Clause.');
-				}
-			}
-			return problems;
 		},
 	},
 	evasionclause: {
@@ -714,19 +705,9 @@ export const Rulesets: import('../sim/dex-formats').FormatDataTable = {
 		effectType: 'ValidatorRule',
 		name: 'Sleep Moves Clause',
 		desc: "Bans all moves that induce sleep, such as Hypnosis",
-		banlist: ['Yawn'],
+		banlist: ['Dark Void', 'Grass Whistle', 'Hypnosis', 'Lovely Kiss', 'Sing', 'Sleep Powder', 'Spore', 'Yawn'],
 		onBegin() {
 			this.add('rule', 'Sleep Moves Clause: Sleep-inducing moves are banned');
-		},
-		onValidateSet(set) {
-			const problems = [];
-			if (set.moves) {
-				for (const id of set.moves) {
-					const move = this.dex.moves.get(id);
-					if (move.status === 'slp') problems.push(move.name + ' is banned by Sleep Moves Clause.');
-				}
-			}
-			return problems;
 		},
 	},
 	gravitysleepclause: {
@@ -1023,8 +1004,7 @@ export const Rulesets: import('../sim/dex-formats').FormatDataTable = {
 	sleepclausemod: {
 		effectType: 'Rule',
 		name: 'Sleep Clause Mod',
-		desc: "Prevents players from putting more than one of their opponent's Pok&eacute;mon to sleep at a time, and bans Mega Gengar from using Hypnosis",
-		banlist: ['Hypnosis + Gengarite'],
+		desc: "Prevents players from putting more than one of their opponent's Pok&eacute;mon to sleep at a time",
 		onBegin() {
 			this.add('rule', 'Sleep Clause Mod: Limit one foe put to sleep');
 		},

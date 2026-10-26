@@ -7,6 +7,10 @@ export const Abilities: ModdedAbilityDataTable = {
 			this.effectState.checkedAngerShell = !(effect.effectType === "Move" && !effect.multihit);
 		},
 	},
+	auraguard: {
+		inherit: true,
+		isNonstandard: null,
+	},
 	berserk: {
 		inherit: true,
 		onDamage(damage, target, source, effect) {

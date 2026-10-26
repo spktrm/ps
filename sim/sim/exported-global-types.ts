@@ -1,8 +1,24 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
+// force .filter(Boolean) to work
+// workaround for https://github.com/microsoft/TypeScript/issues/16655
+export interface Array<T> {
+	filter(predicate: BooleanConstructor, thisArg?: any): Exclude<T, false | null | undefined | '' | 0>[];
+}
+export interface ReadonlyArray<T> {
+	filter(predicate: BooleanConstructor, thisArg?: any): Exclude<T, false | null | undefined | '' | 0>[];
+}
+
 export type Mutable<T> = {
 	-readonly [P in keyof T]: T[P];
 };
+
+/**
+ * Use `${value as DebugOutput}` to tell oxlint to stop complaining about booleans.
+ * Needs to be explicit because booleans in string interpolation is frequently a bug.
+ * Prefer `!` for null/undefined, but you'll still need this after optional chains.
+ */
+export type DebugOutput = unknown;
 
 export type Battle = import('./battle').Battle;
 export type BattleQueue = import('./battle-queue').BattleQueue;
@@ -34,7 +50,7 @@ export type SparseStatsTable = Partial<StatsTable>;
 export type BoostID = StatIDExceptHP | 'accuracy' | 'evasion';
 export type BoostsTable = { [boost in BoostID]: number };
 export type SparseBoostsTable = Partial<BoostsTable>;
-export type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Custom' | 'Gmax';
+export type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Legends' | 'Custom' | 'Gmax';
 
 export type PokemonSet = import('./teams').PokemonSet;
 
@@ -222,7 +238,7 @@ export interface ModdedBattleActions {
 	) => [SpreadMoveDamage, SpreadMoveTargets];
 	switchIn?: (
 		this: BattleActions, pokemon: Pokemon, pos: number, sourceEffect: Effect | null, isDrag?: boolean
-	) => boolean | "pursuitfaint";
+	) => boolean;
 	targetTypeChoices?: (this: BattleActions, targetType: string) => boolean;
 	terastallize?: (this: BattleActions, pokemon: Pokemon) => void;
 	tryMoveHit?: (
@@ -390,7 +406,7 @@ export interface ModdedBattleScriptsData extends Partial<BattleScriptsData> {
 	suppressingWeather?: (this: Battle) => boolean;
 	trunc?: (n: number) => number;
 	win?: (this: Battle, side?: SideID | '' | Side | null) => boolean;
-	faintMessages?: (this: Battle, lastFirst?: boolean, forceCheck?: boolean, checkWin?: boolean) => boolean | undefined;
+	resolveFaints?: (this: Battle, ...args: Parameters<Battle['resolveFaints']>) => boolean | undefined;
 	tiebreak?: (this: Battle) => boolean;
 	calculatePP?: (this: Battle, move: Move, ppUps?: number) => number;
 	checkMoveMakesContact?: (
@@ -400,6 +416,7 @@ export interface ModdedBattleScriptsData extends Partial<BattleScriptsData> {
 		this: Battle, move: ActiveMove, attacker: Pokemon, defender: Pokemon, blockStatus?: boolean
 	) => boolean;
 	checkWin?: (this: Battle, faintQueue?: Battle['faintQueue'][0]) => true | undefined;
+	checkFainted?: (this: Battle) => void;
 	fieldEvent?: (this: Battle, eventid: string, targets?: Pokemon[]) => void;
 	getAllActive?: (this: Battle, includeFainted?: boolean, includeCommanding?: boolean) => Pokemon[];
 	getTarget?: (

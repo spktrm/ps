@@ -96,7 +96,7 @@ const IMPORTS = {
     'Battle', 'ModdedDex', 'Pokemon', 'Effect', 'Move', 'ActiveMove',
     'Side', 'SpreadMoveTargets', 'SpreadMoveDamage', 'ZMoveOptions',
   ],
-  'sim/battle-queue.ts': ['Pokemon', 'ID', 'Move', 'Effect'],
+  'sim/battle-queue.ts': ['Pokemon', 'ID', 'Move', 'Effect', 'Side'],
   'sim/battle-stream.ts': ['ModdedDex'],
   'sim/battle.ts': [
     'Effect', 'Format', 'ID', 'PlayerOptions', 'AnyObject', 'ActiveMove', 'SideID', 'StatsTable',
@@ -155,7 +155,7 @@ const MOD_IMPORTS = {
   'data/mods/gen1stadium/moves.ts': ['ModdedMoveDataTable', 'ActiveMove'],
   'data/mods/gen1stadium/rulesets.ts': ['ModdedFormatDataTable'],
   'data/mods/gen1stadium/scripts.ts': [
-    'ModdedBattleScriptsData', 'StatIDExceptHP', 'BoostID', 'ActiveMove',
+    'ModdedBattleScriptsData', 'StatIDExceptHP', 'BoostID', 'ActiveMove', 'DebugOutput',
   ],
 
   // gen2stadium2
@@ -790,7 +790,7 @@ const changes = async (where, last, now, repo) => ({
           original = original.replace('} else if (set.level < legalityList[moveid]) {',
             '} else if (set.level < (legalityList[moveid] as number)) {');
         } else if (file.endsWith('learnsets.ts')) {
-          original = original.replace('/* eslint-disable max-len */\n\n', '');
+          original = original.replace(/^(\/\* eslint-disable max-len \*\/\n)?\n+/, '');
         }
 
         const typesOnly = file !== 'data/mods/champions/scripts.ts';
@@ -1131,6 +1131,25 @@ const changes = async (where, last, now, repo) => ({
       regex: new RegExp(`(require\\\(.*?)dist\\\/((?<!build\\\/)lib)(.*?\\\))`, 'g'),
       replace: `$1build/cjs/lib$3`,
     }], ignore);
+
+    // Pokémon Showdown lints with oxlint but we lint with ESLint, so translate its directives
+    const generated = [
+      ...['sim', 'data', 'lib', 'config', 'test'].flatMap(dir => tree(path.join(sim, dir))),
+      ...tree(path.join(mods, 'src')),
+      ...tree(path.join(randoms, 'src')),
+      path.join(streams, 'index.ts'),
+    ];
+    for (const file of generated.filter(f => /\.[jt]s$/.test(f))) {
+      const text = fs.readFileSync(file, 'utf8');
+      // typescript-eslint's rules aren't enabled for JavaScript, so drop directives for them there
+      const translated = (file.endsWith('.js')
+        ? text.replaceAll(/\n[^\n]*oxlint-disable-next-line typescript\/[\w-]+[ \t]*(?=\n)/g, '')
+        : text).replaceAll(/oxlint-((?:disable|enable)\S*)([^\n]*)/g,
+        (_, directive, rules) => `eslint-${directive}${rules
+          .replaceAll('typescript/', '@typescript-eslint/')
+          .replaceAll(/(^|[\s,])no-unused-vars\b/g, '$1@typescript-eslint/no-unused-vars')}`);
+      if (translated !== text) fs.writeFileSync(file, translated);
+    }
 
     const messages =
       `-m "Import ${repo.ps}@${now.ps}" ` +

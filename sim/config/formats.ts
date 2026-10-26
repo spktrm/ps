@@ -1508,7 +1508,7 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     name: '[Gen 7] Ubers',
     mod: 'gen7',
     ruleset: [ 'Standard', 'Mega Rayquaza Clause' ],
-    banlist: [ 'Baton Pass' ]
+    banlist: [ 'Baton Pass', 'Hypnosis + Gengarite' ]
   },
   {
     name: '[Gen 7] UU',
