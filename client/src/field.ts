@@ -1,6 +1,7 @@
 import {ID, toID} from '@pkmn/data';
 
 import {Battle} from './battle';
+import {CloneMemo, cloneable, copy, copyRest} from './clone';
 import {Pokemon} from './pokemon';
 
 export type WeatherState<T = ID> = [T, number, number];
@@ -117,8 +118,33 @@ export class Field {
     this.pseudoWeather = {};
   }
 
+  /**
+   * A copy of this field, and so of its battle, that plays on apart from it. `memo` gets the copy
+   * of every object the clone copies, keyed by the original.
+   */
+  clone(memo: CloneMemo = new Map()): this {
+    const copied = memo.get(this);
+    if (copied) return copied as this;
+    const field = Object.create(Object.getPrototypeOf(this));
+    memo.set(this, field);
+    field.battle = this.battle.clone(memo);
+    field.weather = this.weather;
+    field.weatherState = copy(this.weatherState, memo);
+    field.terrain = this.terrain;
+    field.terrainState = copy(this.terrainState, memo);
+    field.pseudoWeather = copy(this.pseudoWeather, memo);
+    FIELD_FIELDS ??= new Set(Object.keys(field));
+    copyRest(this, field, FIELD_FIELDS, memo);
+    return field;
+  }
+
   destroy() {
     // @ts-ignore readonly
     this.battle = null!;
   }
 }
+
+// The fields Field#clone copies by name, read off its first copy
+let FIELD_FIELDS: Set<string> | undefined;
+
+cloneable(Field);

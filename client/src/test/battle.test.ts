@@ -114,6 +114,54 @@ describe('Battle', () => {
     expect(battle.lastMove).toBe('');
   });
 
+  it('#clone', () => {
+    const battle = new Battle(GENS);
+    for (const line of [
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|singles', '|gen|9',
+      '|switch|p1a: Gengar|Gengar, L50, M|100/100', '|switch|p2a: Mew|Mew, L50|100/100',
+      '|turn|1', '|move|p1a: Gengar|Shadow Ball|p2a: Mew', '|-damage|p2a: Mew|50/100',
+    ]) {
+      battle.add(line);
+    }
+
+    const memo = new Map<object, object>();
+    const clone = battle.clone(memo);
+    const mew = battle.p2.active[0]!;
+    const copy = clone.p2.active[0]!;
+
+    expect(clone).not.toBe(battle);
+    expect(memo.get(battle)).toBe(clone);
+    expect(memo.get(mew)).toBe(copy);
+    expect(memo.get(mew.volatiles)).toBe(copy.volatiles);
+    expect(copy).not.toBe(mew);
+    expect(copy.side).toBe(clone.p2);
+    expect(clone.p2.battle).toBe(clone);
+    expect(clone.p1.foe).toBe(clone.p2);
+    expect(clone.p2.team[0]).toBe(copy);
+    expect(clone.gen).toBe(battle.gen);
+    expect(battle.clone(memo)).toBe(clone);
+
+    clone.add('|-damage|p2a: Mew|25/100');
+    expect(copy.hp).toBe(25);
+    expect(mew.hp).toBe(50);
+    expect(clone.turn).toBe(1);
+
+    // a multi battle's partners share their active arrays, and a clone keeps them shared
+    const multi = new Battle(GENS);
+    multi.add('|gametype|multi');
+    const multiClone = multi.clone();
+    expect(multiClone.p1.active).toBe(multiClone.p3!.active);
+    expect(multiClone.p3!.active).not.toBe(multi.p3!.active);
+    expect(multiClone.p3!.battle).toBe(multiClone);
+
+    // sides a clone adds belong to it
+    const fresh = new Battle(GENS);
+    const freshClone = fresh.clone();
+    freshClone.add('|gametype|freeforall');
+    expect(freshClone.p3!.battle).toBe(freshClone);
+    expect(fresh.p3).toBeUndefined();
+  });
+
   it('#destroy', () => {
     const battle = new Battle(GENS);
 

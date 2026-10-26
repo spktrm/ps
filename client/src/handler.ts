@@ -7,6 +7,7 @@ import {
 } from '@pkmn/protocol';
 
 import {Battle, NA, NULL} from './battle';
+import {CloneMemo, cloneable, copyRest} from './clone';
 import {LastItemEffect} from './pokemon';
 
 const BOOSTS: BoostID[] = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'];
@@ -19,6 +20,18 @@ export class Handler implements Protocol.Handler {
   constructor(battle: Battle, player: ID | null = null) {
     this.battle = battle;
     this.player = player;
+  }
+
+  clone(memo: CloneMemo = new Map()): this {
+    const copied = memo.get(this);
+    if (copied) return copied as this;
+    const handler = Object.create(Object.getPrototypeOf(this));
+    memo.set(this, handler);
+    handler.battle = this.battle.clone(memo);
+    handler.player = this.player;
+    HANDLER_FIELDS ??= new Set(Object.keys(handler));
+    copyRest(this, handler, HANDLER_FIELDS, memo);
+    return handler;
   }
 
   '|start|'() {
@@ -56,9 +69,9 @@ export class Handler implements Protocol.Handler {
       case 'freeforall':
         this.battle.pokemonControlled = 1;
         // @ts-ignore readonly
-        if (!this.battle.p3) this.battle.p3 = this.battle.createSide(3);
+        if (!this.battle.p3) this.battle.p3 = this.battle.createSide(this.battle, 3);
         // @ts-ignore readonly
-        if (!this.battle.p4) this.battle.p4 = this.battle.createSide(4);
+        if (!this.battle.p4) this.battle.p4 = this.battle.createSide(this.battle, 4);
         this.battle.p3.foe = this.battle.p2;
         this.battle.p4.foe = this.battle.p1;
         if (this.battle.gameType === 'multi') {
@@ -972,6 +985,11 @@ export class Handler implements Protocol.Handler {
     }
   }
 }
+
+// The fields Handler#clone copies by name, read off its first copy
+let HANDLER_FIELDS: Set<string> | undefined;
+
+cloneable(Handler);
 
 function sanitizeName(name: any) {
   if (!name) return '';

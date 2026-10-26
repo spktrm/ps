@@ -84,6 +84,10 @@ application.
   so that the set information can be included with the tracked `Pokemon` instances (though note that
   the `TeamValidator` inside the simulator may make modifications to the set which may cause
   discrepancies).
+- a `Battle` can be **cloned** with `battle.clone(memo?)` to get a copy that plays on apart from
+  the original (eg. to search from a position), sharing only its data. Every object the clone
+  copies is recorded in `memo`, keyed by the original, so that references to the battle's objects
+  held outside of it can be followed to their copies.
 
 ## License
 

@@ -6,6 +6,7 @@ import {
   PokemonHealth, PokemonIdent, PokemonSearchID, Protocol, SpeciesName,
 } from '@pkmn/protocol';
 
+import {CloneMemo, cloneAll, cloneable, copy, copyRest} from './clone';
 import {Field} from './field';
 import {Handler} from './handler';
 import {Pokemon} from './pokemon';
@@ -54,7 +55,7 @@ export class Battle {
 
   private readonly handler: Handler;
 
-  private readonly createSide: (n: 0 | 1 | 2 | 3) => Side;
+  private readonly createSide: (battle: Battle, n: 0 | 1 | 2 | 3) => Side;
 
   constructor(
     gens: Generations,
@@ -66,14 +67,15 @@ export class Battle {
     this.gens = gens;
     this.gen = gens.get(8);
 
-    this.createSide = (n: 0 | 1 | 2 | 3) =>
-      side(this, n,
+    // Takes the battle instead of closing over it, so that a clone can share it
+    this.createSide = (battle: Battle, n: 0 | 1 | 2 | 3) =>
+      side(battle, n,
         !n ? sets && (!sets[0] || Array.isArray(sets[0]) ? sets[0] : sets as PokemonSet[])
         : sets && Array.isArray(sets[1]) ? sets[1] : undefined);
 
     this.field = field(this);
-    this.p1 = this.createSide(0);
-    this.p2 = this.createSide(1);
+    this.p1 = this.createSide(this, 0);
+    this.p2 = this.createSide(this, 1);
     this.p1.foe = this.p2;
     this.p2.foe = this.p1;
     this.sides = [this.p1, this.p2];
@@ -513,6 +515,41 @@ export class Battle {
     this.lastMove = '';
   }
 
+  /**
+   * A copy of this battle that plays on apart from it. Its data (the generations and their dex
+   * objects) is shared, but everything else is copied. `memo` gets the copy of every object the
+   * clone copies, keyed by the original, to follow references held outside the battle.
+   */
+  clone(memo: CloneMemo = new Map()): this {
+    const copied = memo.get(this);
+    if (copied) return copied as this;
+    const battle = Object.create(Object.getPrototypeOf(this));
+    memo.set(this, battle);
+    battle.pokemonControlled = this.pokemonControlled;
+    battle.rules = copy(this.rules, memo);
+    battle.gens = this.gens;
+    battle.gen = this.gen;
+    battle.createSide = this.createSide;
+    battle.field = this.field.clone(memo);
+    battle.p1 = this.p1.clone(memo);
+    battle.p2 = this.p2.clone(memo);
+    battle.sides = cloneAll(this.sides, memo);
+    battle.gameType = this.gameType;
+    battle.rated = this.rated;
+    battle.tier = this.tier;
+    battle.teamPreviewCount = this.teamPreviewCount;
+    battle.speciesClause = this.speciesClause;
+    battle.kickingInactive = this.kickingInactive;
+    battle.totalTimeLeft = this.totalTimeLeft;
+    battle.graceTimeLeft = this.graceTimeLeft;
+    battle.handler = this.handler.clone(memo);
+    battle.turn = this.turn;
+    battle.lastMove = this.lastMove;
+    BATTLE_FIELDS ??= new Set(Object.keys(battle));
+    copyRest(this, battle, BATTLE_FIELDS, memo);
+    return battle;
+  }
+
   destroy() {
     this.field.destroy();
     // @ts-ignore readonly
@@ -532,3 +569,8 @@ export class Battle {
     this.p4 = null!;
   }
 }
+
+// The fields Battle#clone copies by name, read off its first copy
+let BATTLE_FIELDS: Set<string> | undefined;
+
+cloneable(Battle);

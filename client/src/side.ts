@@ -4,6 +4,7 @@ import {
 } from '@pkmn/protocol';
 
 import {Battle} from './battle';
+import {CloneMemo, cloneAll, cloneable, copy, copyRest} from './clone';
 import {Pokemon} from './pokemon';
 
 export class Side {
@@ -341,6 +342,36 @@ export class Side {
     this.sideConditions = {};
   }
 
+  /**
+   * A copy of this side, and so of its battle, that plays on apart from it. `memo` gets the copy
+   * of every object the clone copies, keyed by the original.
+   */
+  clone(memo: CloneMemo = new Map()): this {
+    const copied = memo.get(this);
+    if (copied) return copied as this;
+    const side = Object.create(Object.getPrototypeOf(this));
+    memo.set(this, side);
+    side.provider = this.provider;
+    side.battle = this.battle.clone(memo);
+    side.n = this.n;
+    side.sets = copy(this.sets, memo);
+    side.id = this.id;
+    side.name = this.name;
+    side.avatar = this.avatar;
+    side.rating = this.rating;
+    side.totalPokemon = this.totalPokemon;
+    side.active = cloneAll(this.active, memo);
+    side.focus = this.focus;
+    side.lastPokemon = copy(this.lastPokemon, memo);
+    side.team = cloneAll(this.team, memo);
+    side.sideConditions = copy(this.sideConditions, memo);
+    side.wisher = copy(this.wisher, memo);
+    side.faints = this.faints;
+    SIDE_FIELDS ??= new Set(Object.keys(side));
+    copyRest(this, side, SIDE_FIELDS, memo);
+    return side;
+  }
+
   destroy() {
     this.clearPokemon();
     // @ts-ignore readonly
@@ -348,3 +379,8 @@ export class Side {
     this.foe = null!;
   }
 }
+
+// The fields Side#clone copies by name, read off its first copy
+let SIDE_FIELDS: Set<string> | undefined;
+
+cloneable(Side);

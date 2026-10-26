@@ -8,6 +8,7 @@ import {
 } from '@pkmn/protocol';
 
 import {NA} from './battle';
+import {CloneMemo, cloneable, copy, copyRest} from './clone';
 import {Side} from './side';
 
 interface EffectState {
@@ -726,8 +727,79 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.name = this.name || this.baseSpeciesForme;
   }
 
+  /**
+   * A copy of this Pokémon, and so of its side and battle, that plays on apart from it. `memo`
+   * gets the copy of every object the clone copies, keyed by the original.
+   */
+  clone(memo: CloneMemo = new Map()): this {
+    const copied = memo.get(this);
+    if (copied) return copied as this;
+    const pokemon = Object.create(Object.getPrototypeOf(this));
+    memo.set(this, pokemon);
+    pokemon.side = this.side.clone(memo);
+    pokemon.set = copy(this.set, memo);
+    pokemon.slot = this.slot;
+    pokemon.baseSpeciesForme = this.baseSpeciesForme;
+    pokemon.details = this.details;
+    pokemon.name = this.name;
+    pokemon.level = this.level;
+    pokemon.shiny = this.shiny;
+    pokemon.gender = this.gender;
+    pokemon.originalIdent = this.originalIdent;
+    pokemon.searchid = this.searchid;
+    pokemon.hp = this.hp;
+    pokemon.maxhp = this.maxhp;
+    pokemon.baseMaxhp = this.baseMaxhp;
+    pokemon.hpcolor = this.hpcolor;
+    pokemon.status = this.status;
+    pokemon.fainted = this.fainted;
+    pokemon.newlySwitched = this.newlySwitched;
+    pokemon.beingCalledBack = this.beingCalledBack;
+    pokemon.statusStage = this.statusStage;
+    pokemon.statusState = copy(this.statusState, memo);
+    pokemon.boosts = copy(this.boosts, memo);
+    pokemon.volatiles = copy(this.volatiles, memo);
+    pokemon.ability = this.ability;
+    pokemon.baseAbility = this.baseAbility;
+    pokemon.illusion = copy(this.illusion, memo);
+    pokemon.revealedDetails = this.revealedDetails;
+    pokemon.item = this.item;
+    pokemon.itemEffect = this.itemEffect;
+    pokemon.lastItem = this.lastItem;
+    pokemon.lastItemEffect = this.lastItemEffect;
+    pokemon.teamPreviewItem = this.teamPreviewItem;
+    pokemon.nature = this.nature;
+    pokemon.hpType = this.hpType;
+    pokemon.terastallized = this.terastallized;
+    pokemon.moveSlots = copy(this.moveSlots, memo);
+    pokemon.maxMoves = copy(this.maxMoves, memo);
+    pokemon.zMoves = copy(this.zMoves, memo);
+    pokemon.canDynamax = this.canDynamax;
+    pokemon.canGigantamax = this.canGigantamax;
+    pokemon.canMegaEvo = this.canMegaEvo;
+    pokemon.canUltraBurst = this.canUltraBurst;
+    pokemon.canTerastallize = this.canTerastallize;
+    pokemon.trapped = this.trapped;
+    pokemon.maybeTrapped = this.maybeTrapped;
+    pokemon.maybeDisabled = this.maybeDisabled;
+    pokemon.lastMove = this.lastMove;
+    pokemon.lastMoveTargetLoc = this.lastMoveTargetLoc;
+    pokemon.moveThisTurn = this.moveThisTurn;
+    pokemon.hurtThisTurn = this.hurtThisTurn;
+    pokemon.movesUsedWhileActive = copy(this.movesUsedWhileActive, memo);
+    pokemon.timesAttacked = this.timesAttacked;
+    POKEMON_FIELDS ??= new Set(Object.keys(pokemon));
+    copyRest(this, pokemon, POKEMON_FIELDS, memo);
+    return pokemon;
+  }
+
   destroy() {
     // @ts-ignore readonly
     this.side = null!;
   }
 }
+
+// The fields Pokemon#clone copies by name, read off its first copy
+let POKEMON_FIELDS: Set<string> | undefined;
+
+cloneable(Pokemon);
