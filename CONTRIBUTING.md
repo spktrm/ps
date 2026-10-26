@@ -78,6 +78,19 @@ script's header:
 > the large amount of unit and integration tests - assume that whenever you run this script
 > everything is broken unless `npm test:integration` and manual inspection suggests otherwise.
 
+`vendor/pokemon-showdown` tracks the `latest` branch of
+[spktrm/pokemon-showdown](https://github.com/spktrm/pokemon-showdown), which is
+`smogon/pokemon-showdown`'s `master` plus our experimental speedups. Before importing, merge
+upstream into it and push it, as `import` pulls from the fork:
+
+```sh
+$ cd vendor/pokemon-showdown
+$ git remote add upstream https://github.com/smogon/pokemon-showdown.git # once
+$ git fetch upstream && git checkout -B latest origin/latest
+$ git merge upstream/master && git push origin latest
+$ git checkout --detach && cd ../.. && node import
+```
+
 An important part of running the `import` script is examining all of the changes from Pokémon
 Showdown and updating any and all packages (generated or otherwise) that may require changes due to
 changes upstream.

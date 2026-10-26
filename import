@@ -2,14 +2,14 @@
 /* eslint-disable no-useless-escape */
 'use strict';
 
-// This script syncs the vendored submodules of smogon/pokemon-showdown and
-// smogon/pokemon-showdown-client and highlights 'interesting' changes before performing several
-// manipulations on the former to generate portions of the @pkmn/sim, @pkmn/mods, @pkmn/randoms and
-// @pkmn/dex packages. Each of these packages involve some amount of handwritten code (which may be
-// broken or become out of sync after running this script) in addition to code generated completely
-// from Pokémon Showdown, and many of the other packages in this repository which have been 'hard'
-// forked from Pokémon Showdown will possibly require manual intervention and updates after an
-// import.
+// This script syncs the vendored submodules of spktrm/pokemon-showdown (the `latest` branch, which
+// is smogon/pokemon-showdown plus our experimental speedups) and smogon/pokemon-showdown-client and
+// highlights 'interesting' changes before performing several manipulations on the former to
+// generate portions of the @pkmn/sim, @pkmn/mods, @pkmn/randoms and @pkmn/dex packages. Each of
+// these packages involve some amount of handwritten code (which may be broken or become out of sync
+// after running this script) in addition to code generated completely from Pokémon Showdown, and
+// many of the other packages in this repository which have been 'hard' forked from Pokémon Showdown
+// will possibly require manual intervention and updates after an import.
 //
 // This is the most 'HERE BE DRAGONS' and hacky code in the entire project, but is also the magic
 // sauce™ that makes everything work. The fragile nature of this whole ordeal is slightly offset
@@ -691,15 +691,19 @@ const rewrite = (original, fn) => {
 };
 
 const HEAD = async where => (await execOrDie('git rev-parse HEAD', where)).slice(0, 8);
+// The GitHub repository a submodule is synced from, eg. 'smogon/pokemon-showdown-client'
+const REPO = async where => (await execOrDie('git remote get-url origin', where))
+  .trim().replace(/^.*github\.com[:/]|\.git$/g, '');
 // Figure out what has changed in PS so that we can later filter out just the interesting changes
 // A GitHub URL for the diff is added for convenience in the event review is required
 const changes = async (where, last, now, repo) => ({
   files: (await execOrDie(`git diff --name-only ${last}..${now}`, where)).trim().split('\n'),
-  url: `https://github.com/smogon/${repo}/compare/${last}..${now}`,
+  url: `https://github.com/${repo}/compare/${last}..${now}`,
 });
 
 (async () => {
   const last = {ps: await HEAD(ps), psc: await HEAD(psc)};
+  const repo = {ps: await REPO(ps), psc: await REPO(psc)};
   try {
     // `git -C vendor/pokemon-showdown pull origin master` etc works for individual submodules, but
     // this command will update both repositories at once
@@ -707,8 +711,8 @@ const changes = async (where, last, now, repo) => ({
     const now = {ps: await HEAD(ps), psc: await HEAD(psc)};
 
     const changed = {
-      ps: await changes(ps, last.ps, now.ps, 'pokemon-showdown'),
-      psc: await changes(psc, last.psc, now.psc, 'pokemon-showdown-client'),
+      ps: await changes(ps, last.ps, now.ps, repo.ps),
+      psc: await changes(psc, last.psc, now.psc, repo.psc),
     };
 
     console.log(`\n${changed.ps.url}\n`);
@@ -1129,8 +1133,8 @@ const changes = async (where, last, now, repo) => ({
     }], ignore);
 
     const messages =
-      `-m "Import smogon/pokemon-showdown@${now.ps}" ` +
-      `-m "smogon/pokemon-showdown-client@${now.psc}"`;
+      `-m "Import ${repo.ps}@${now.ps}" ` +
+      `-m "${repo.psc}@${now.psc}"`;
     console.log(`\ngit add -A && git commit ${messages}`);
   } catch (err) {
     await execOrDie(`git reset --hard ${last.ps}`, ps);
