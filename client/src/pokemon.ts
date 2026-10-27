@@ -733,10 +733,7 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.name = this.name || this.baseSpeciesForme;
   }
 
-  /**
-   * A copy of this Pokémon, and so of its side and battle, that plays on apart from it. `memo`
-   * gets the copy of every object the clone copies, keyed by the original.
-   */
+  /** A copy of this Pokémon and its battle. `memo` maps each original to its copy. */
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;

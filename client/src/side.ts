@@ -342,10 +342,7 @@ export class Side {
     this.sideConditions = {};
   }
 
-  /**
-   * A copy of this side, and so of its battle, that plays on apart from it. `memo` gets the copy
-   * of every object the clone copies, keyed by the original.
-   */
+  /** A copy of this side and its battle. `memo` maps each original to its copy. */
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;

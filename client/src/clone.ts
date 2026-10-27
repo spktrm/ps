@@ -1,19 +1,14 @@
 /** Every object a clone has copied, mapped from the original to its copy. */
 export type CloneMemo = Map<object, object>;
 
-// The client's own classes. Their instances are cloned with their own `clone` wherever a clone
-// reaches them, while instances of any other class (the dex's objects, Generations) are shared.
+// the client's classes, whose objects are cloned instead of shared
 const CLONEABLE: Array<abstract new (...args: any[]) => {clone(memo: CloneMemo): object}> = [];
 
 export function cloneable(constructor: (typeof CLONEABLE)[number]) {
   CLONEABLE.push(constructor);
 }
 
-/**
- * Copies `value` for a clone: plain objects, arrays, Maps, Sets and typed arrays are copied, the
- * client's own objects are cloned and anything else is shared. An object reached more than once
- * is copied once, so references shared between objects (and cycles) are kept.
- */
+/** Copies plain data, clones the client's objects and shares anything else. */
 export function copy<T>(value: T, memo: CloneMemo): T {
   if (value === null || typeof value !== 'object') return value;
   const copied = memo.get(value);
@@ -69,10 +64,7 @@ export function cloneAll<T extends {clone(memo: CloneMemo): T} | null | undefine
   return out;
 }
 
-/**
- * Copies onto `target` the fields of `source` not in `named`: those added after construction,
- * which a class's `clone` doesn't copy by name.
- */
+/** Copies the fields of `source` that aren't in `named` onto `target`. */
 export function copyRest(source: object, target: object, named: Set<string>, memo: CloneMemo) {
   for (const key in source) {
     if (!named.has(key)) (target as any)[key] = copy((source as any)[key], memo);

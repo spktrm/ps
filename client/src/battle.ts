@@ -515,11 +515,7 @@ export class Battle {
     this.lastMove = '';
   }
 
-  /**
-   * A copy of this battle that plays on apart from it. Its data (the generations and their dex
-   * objects) is shared, but everything else is copied. `memo` gets the copy of every object the
-   * clone copies, keyed by the original, to follow references held outside the battle.
-   */
+  /** A copy of this battle that shares only its dex data. `memo` maps each original to its copy. */
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;
