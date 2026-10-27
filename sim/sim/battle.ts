@@ -34,7 +34,7 @@ import {
  */
 
 import { Dex, toID } from './dex';
-import { definedCallbackNames } from './dex-data';
+import { definedCallbackNames, formatCallbackNames, speciesCallbackNames } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -558,21 +558,21 @@ export class Battle {
 		if (eventid === 'Residual') {
 			getKey = 'duration';
 		}
-		let handlers = this.findFieldEventHandlers(this.field, `onField${eventid}`, getKey);
+		const handlers = this.findFieldEventHandlers(this.field, `onField${eventid}`, getKey);
 		for (const side of this.sides) {
 			if (side.n < 2 || !side.allySide) {
-				handlers = handlers.concat(this.findSideEventHandlers(side, `onSide${eventid}`, getKey));
+				this.findSideEventHandlers(side, `onSide${eventid}`, getKey, undefined, handlers);
 			}
 			for (const active of side.active) {
 				if (!active) continue;
 				if (eventid === 'SwitchIn') {
-					handlers = handlers.concat(this.findPokemonEventHandlers(active, `onAny${eventid}`));
+					this.findPokemonEventHandlers(active, `onAny${eventid}`, undefined, handlers);
 				}
 				if (targets && !targets.includes(active)) continue;
-				handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackName, getKey));
-				handlers = handlers.concat(this.findSideEventHandlers(side, callbackName, undefined, active));
-				handlers = handlers.concat(this.findFieldEventHandlers(this.field, callbackName, undefined, active));
-				handlers = handlers.concat(this.findBattleEventHandlers(callbackName, getKey, active));
+				this.findPokemonEventHandlers(active, callbackName, getKey, handlers);
+				this.findSideEventHandlers(side, callbackName, undefined, active, handlers);
+				this.findFieldEventHandlers(this.field, callbackName, undefined, active, handlers);
+				this.findBattleEventHandlers(callbackName, getKey, active, handlers);
 			}
 		}
 		this.speedSort(handlers);
@@ -857,6 +857,15 @@ export class Battle {
 				}, `on${eventid}`));
 			}
 		}
+		if (!handlers.length) {
+			// nothing to run, so return what the event would have returned
+			if (relayVar === undefined || relayVar === null) relayVar = true;
+			if (Array.isArray(target)) return Array.isArray(relayVar) ? relayVar : target.map(() => true);
+			if (typeof relayVar === 'number' && relayVar === Math.abs(Math.floor(relayVar))) {
+				relayVar = this.modify(relayVar, 1);
+			}
+			return relayVar;
+		}
 
 		if (['Invulnerability', 'TryHit', 'DamagingHit', 'EntryHazard'].includes(eventid)) {
 			handlers.sort(Battle.compareLeftToRightOrder);
@@ -1101,7 +1110,7 @@ export class Battle {
 		let callback = (found === NO_CALLBACK ? undefined : found) as Function | undefined;
 		// Abilities and items Start at different times during the SwitchIn event, so we run their onStart handlers
 		// during the SwitchIn event instead of running the Start event during switch-ins
-		if (target instanceof Pokemon && callbackName === 'onSwitchIn') {
+		if (callbackName === 'onSwitchIn' && target instanceof Pokemon) {
 			if (callback === undefined && !(effect as any).onAnySwitchIn && (
 				['Ability', 'Item'].includes(effect.effectType) ||
 				(effect.effectType === 'Status' && ['ability', 'item'].includes(effect.id.split(':')[0]))
@@ -1145,58 +1154,58 @@ export class Battle {
 		const hasAny = prefixedHandlers && defined.has(callbackNames.any);
 		const hasSource = prefixedHandlers && defined.has(callbackNames.source);
 		if (target instanceof Pokemon && (target.isActive || source?.isActive)) {
-			if (hasOn) handlers = this.findPokemonEventHandlers(target, callbackNames.on);
+			if (hasOn) this.findPokemonEventHandlers(target, callbackNames.on, undefined, handlers);
 			if (hasAlly || hasAny) {
 				for (const allyActive of target.alliesAndSelf()) {
-					if (hasAlly) handlers.push(...this.findPokemonEventHandlers(allyActive, callbackNames.ally));
-					if (hasAny) handlers.push(...this.findPokemonEventHandlers(allyActive, callbackNames.any));
+					if (hasAlly) this.findPokemonEventHandlers(allyActive, callbackNames.ally, undefined, handlers);
+					if (hasAny) this.findPokemonEventHandlers(allyActive, callbackNames.any, undefined, handlers);
 				}
 			}
 			if (hasFoe || hasAny) {
 				for (const foeActive of target.foes()) {
-					if (hasFoe) handlers.push(...this.findPokemonEventHandlers(foeActive, callbackNames.foe));
-					if (hasAny) handlers.push(...this.findPokemonEventHandlers(foeActive, callbackNames.any));
+					if (hasFoe) this.findPokemonEventHandlers(foeActive, callbackNames.foe, undefined, handlers);
+					if (hasAny) this.findPokemonEventHandlers(foeActive, callbackNames.any, undefined, handlers);
 				}
 			}
 			target = target.side;
 		}
 		if (source && hasSource) {
-			handlers.push(...this.findPokemonEventHandlers(source, callbackNames.source));
+			this.findPokemonEventHandlers(source, callbackNames.source, undefined, handlers);
 		}
 		if (target instanceof Side) {
 			for (const side of this.sides) {
 				if (shouldBubbleDown) {
 					for (const active of side.active) {
 						if (side === target || side === target.allySide) {
-							if (hasOn) handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackNames.on));
+							if (hasOn) this.findPokemonEventHandlers(active, callbackNames.on, undefined, handlers);
 						} else if (hasFoe) {
-							handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackNames.foe));
+							this.findPokemonEventHandlers(active, callbackNames.foe, undefined, handlers);
 						}
-						if (hasAny) handlers = handlers.concat(this.findPokemonEventHandlers(active, callbackNames.any));
+						if (hasAny) this.findPokemonEventHandlers(active, callbackNames.any, undefined, handlers);
 					}
 				}
 				if (side.n < 2 || !side.allySide) {
 					if (side === target || side === target.allySide) {
-						if (hasOn) handlers.push(...this.findSideEventHandlers(side, callbackNames.on));
+						if (hasOn) this.findSideEventHandlers(side, callbackNames.on, undefined, undefined, handlers);
 					} else if (hasFoe) {
-						handlers.push(...this.findSideEventHandlers(side, callbackNames.foe));
+						this.findSideEventHandlers(side, callbackNames.foe, undefined, undefined, handlers);
 					}
-					if (hasAny) handlers.push(...this.findSideEventHandlers(side, callbackNames.any));
+					if (hasAny) this.findSideEventHandlers(side, callbackNames.any, undefined, undefined, handlers);
 				}
 			}
 		}
-		if (hasOn) handlers.push(...this.findFieldEventHandlers(this.field, callbackNames.on));
-		handlers.push(...this.findBattleEventHandlers(callbackNames.on));
+		if (hasOn) this.findFieldEventHandlers(this.field, callbackNames.on, undefined, undefined, handlers);
+		this.findBattleEventHandlers(callbackNames.on, undefined, undefined, handlers);
 		return handlers;
 	}
 
-	findPokemonEventHandlers(pokemon: Pokemon, callbackName: string, getKey?: 'duration') {
-		const handlers: EventListener[] = [];
+	findPokemonEventHandlers(pokemon: Pokemon, callbackName: string, getKey?: 'duration', handlers: EventListener[] = []) {
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
 		const callbacks = callbacksNamed(callbackName);
 
+		// an empty status or item has no callbacks
 		const status = pokemon.getStatus();
-		let callback = this.getCallback(pokemon, status, callbackName, callbacks);
+		let callback = pokemon.status ? this.getCallback(pokemon, status, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && pokemon.statusState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: status, callback, state: pokemon.statusState, end: pokemon.clearStatus, effectHolder: pokemon,
@@ -1220,14 +1229,15 @@ export class Battle {
 			}, callbackName));
 		}
 		const item = pokemon.getItem();
-		callback = this.getCallback(pokemon, item, callbackName, callbacks);
+		callback = pokemon.item ? this.getCallback(pokemon, item, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
 			}, callbackName));
 		}
 		const species = pokemon.baseSpecies;
-		callback = this.getCallback(pokemon, species, callbackName, callbacks);
+		callback = speciesCallbackNames.has(callbackName) ?
+			this.getCallback(pokemon, species, callbackName, callbacks) : undefined;
 		if (callback !== undefined) {
 			handlers.push(this.resolvePriority({
 				effect: species, callback, state: pokemon.speciesState, end() {}, effectHolder: pokemon,
@@ -1253,12 +1263,12 @@ export class Battle {
 		return handlers;
 	}
 
-	findBattleEventHandlers(callbackName: string, getKey?: 'duration', customHolder?: Pokemon) {
-		const handlers: EventListener[] = [];
-
+	findBattleEventHandlers(
+		callbackName: string, getKey?: 'duration', customHolder?: Pokemon, handlers: EventListener[] = []
+	) {
 		let callback;
 		const format = this.format;
-		if (getKey || definedCallbackNames.has(callbackName)) callback = this.getCallback(this, format, callbackName);
+		if (getKey || formatCallbackNames.has(callbackName)) callback = this.getCallback(this, format, callbackName);
 		if (callback !== undefined || (getKey && this.formatData[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: format, callback, state: this.formatData, end: null, effectHolder: customHolder || this,
@@ -1276,8 +1286,9 @@ export class Battle {
 		return handlers;
 	}
 
-	findFieldEventHandlers(field: Field, callbackName: string, getKey?: 'duration', customHolder?: Pokemon) {
-		const handlers: EventListener[] = [];
+	findFieldEventHandlers(
+		field: Field, callbackName: string, getKey?: 'duration', customHolder?: Pokemon, handlers: EventListener[] = []
+	) {
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
 		const callbacks = callbacksNamed(callbackName);
 
@@ -1293,8 +1304,9 @@ export class Battle {
 				}, callbackName));
 			}
 		}
+		// an empty weather or terrain has no callbacks
 		const weather = field.getWeather();
-		callback = this.getCallback(field, weather, callbackName, callbacks);
+		callback = field.weather ? this.getCallback(field, weather, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && this.field.weatherState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: weather, callback, state: this.field.weatherState,
@@ -1302,7 +1314,7 @@ export class Battle {
 			}, callbackName));
 		}
 		const terrain = field.getTerrain();
-		callback = this.getCallback(field, terrain, callbackName, callbacks);
+		callback = field.terrain ? this.getCallback(field, terrain, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && field.terrainState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: terrain, callback, state: field.terrainState,
@@ -1313,8 +1325,9 @@ export class Battle {
 		return handlers;
 	}
 
-	findSideEventHandlers(side: Side, callbackName: string, getKey?: 'duration', customHolder?: Pokemon) {
-		const handlers: EventListener[] = [];
+	findSideEventHandlers(
+		side: Side, callbackName: string, getKey?: 'duration', customHolder?: Pokemon, handlers: EventListener[] = []
+	) {
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
 		const callbacks = callbacksNamed(callbackName);
 
@@ -1831,12 +1844,13 @@ export class Battle {
 
 				pokemon.trapped = pokemon.maybeTrapped = false;
 				this.runEvent('TrapPokemon', pokemon);
-				if (!pokemon.knownType || this.dex.getImmunity('trapped', pokemon)) {
+				const canBeTrapped = !pokemon.knownType || this.dex.getImmunity('trapped', pokemon);
+				if (canBeTrapped) {
 					this.runEvent('MaybeTrapPokemon', pokemon);
 				}
 				// canceling switches would leak information
 				// if a foe might have a trapping ability
-				if (this.gen > 2) {
+				if (this.gen > 2 && canBeTrapped) {
 					for (const source of pokemon.foes()) {
 						const species = (source.illusion || source).species;
 						if (!species.abilities) continue;
@@ -1857,7 +1871,6 @@ export class Battle {
 							}
 							const ability = this.dex.abilities.get(abilityName);
 							if (ruleTable.has('-ability:' + ability.id)) continue;
-							if (pokemon.knownType && !this.dex.getImmunity('trapped', pokemon)) continue;
 							this.singleEvent('FoeMaybeTrapPokemon', ability, {}, pokemon, source);
 						}
 					}

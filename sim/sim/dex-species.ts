@@ -13,7 +13,10 @@ import {
 } from './exported-global-types';
 
 import {Utils} from '../lib';
-import {assignMissingFields, toID, BasicEffect, type ModdedEffectText} from './dex-data';
+import {
+	assignMissingFields, toID, BasicEffect, type ModdedEffectText, addDefinedCallbackNames,
+	speciesCallbackNames,
+} from './dex-data';
 
 interface SpeciesAbility {
 	0: string;
@@ -312,6 +315,7 @@ export class Species extends BasicEffect implements Readonly<BasicEffect & Speci
 
 	constructor(data: AnyObject) {
 		super(data);
+		addDefinedCallbackNames(data, speciesCallbackNames);
 
 		this.fullname = `pokemon: ${data.name}`;
 		this.effectType = 'Pokemon';
@@ -555,6 +559,7 @@ export class DexSpecies {
 			// Inherit any statuses from the base species (Arceus, Silvally).
 			const baseSpeciesStatuses = this.dex.data.Conditions[toID(species.baseSpecies)];
 			if (baseSpeciesStatuses !== undefined) {
+				addDefinedCallbackNames(baseSpeciesStatuses, speciesCallbackNames);
 				for (const key in baseSpeciesStatuses) {
 					if (!(key in species)) {
 						(species as any)[key] = (baseSpeciesStatuses as any)[key];
