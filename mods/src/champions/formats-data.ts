@@ -1412,7 +1412,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		doublesTier: "DOU",
 	},
 	sneasler: {
-		tier: "OU",
+		tier: "Uber",
 		doublesTier: "DOU",
 	},
 	teddiursa: {

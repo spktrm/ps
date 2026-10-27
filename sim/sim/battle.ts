@@ -34,7 +34,7 @@ import {
  */
 
 import { Dex, toID } from './dex';
-import { addDefinedCallbackNames, definedCallbackNames } from './dex-data';
+import { definedCallbackNames } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -128,8 +128,7 @@ interface EventCallbackNames {
 	prefixed: boolean;
 }
 
-// Each event's callback names, built once: the same string objects are reused,
-// so the keyed loads on effects see a name already internalised.
+// callback names for each event, so they aren't rebuilt on every call
 const eventCallbackNames = new Map<string, EventCallbackNames>();
 
 function callbackNamesOf(eventName: string): EventCallbackNames {
@@ -148,12 +147,9 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 	return names;
 }
 
-// Each effect's callbacks by name, read once. Effects are of hundreds of shapes,
-// so `effect[callbackName]` is a megamorphic load, and handler search was about a
-// third of simulation time when profiled. An effect's handlers are fixed at
-// construction. NO_CALLBACK marks one it lacks, apart from one it holds as null.
-// They're kept by name and then by effect, so that a search for one name through
-// many effects only looks up the name once.
+// callbacks by name and then by effect, since reading them off the effect every time is slow
+// (an effect's callbacks don't change after it's created)
+// NO_CALLBACK marks a callback the effect doesn't have, since undefined means it hasn't been looked up yet
 const NO_CALLBACK = {};
 const callbacksByName = new Map<string, WeakMap<object, unknown>>();
 
@@ -1098,14 +1094,11 @@ export class Battle {
 	) {
 		let found = callbacks.get(effect);
 		if (found === undefined) {
-			// effects not built from a BasicEffect (made by some mods) define callbacks too
-			addDefinedCallbackNames(effect);
 			found = (effect as any)[callbackName];
 			if (found === undefined) found = NO_CALLBACK;
 			callbacks.set(effect, found);
 		}
-		let callback = found as Function | undefined;
-		if (found === NO_CALLBACK) callback = undefined;
+		let callback = (found === NO_CALLBACK ? undefined : found) as Function | undefined;
 		// Abilities and items Start at different times during the SwitchIn event, so we run their onStart handlers
 		// during the SwitchIn event instead of running the Start event during switch-ins
 		if (target instanceof Pokemon && callbackName === 'onSwitchIn') {
@@ -2688,6 +2681,7 @@ export class Battle {
 			faintData = this.faintQueue.shift()!;
 			const pokemon: Pokemon = faintData.target;
 			if (!pokemon.fainted && this.runEvent('BeforeFaint', pokemon, faintData.source, faintData.effect)) {
+				const illusion = pokemon.illusion;
 				if (this.gen <= 4 && !faintData.faintEventDone) {
 					this.runEvent('Faint', pokemon, faintData.source, faintData.effect);
 				}
@@ -2713,7 +2707,7 @@ export class Battle {
 				if (pokemon.formeRegression) {
 					// after clearing volatiles
 					pokemon.details = pokemon.getUpdatedDetails();
-					this.add('detailschange', pokemon, pokemon.details, '[silent]');
+					if (!illusion) this.add('detailschange', pokemon, pokemon.details, '[silent]');
 					pokemon.updateMaxHp();
 					pokemon.formeRegression = false;
 				}
