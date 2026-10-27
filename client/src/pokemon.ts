@@ -447,6 +447,12 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
 
   rememberMove(moveName: MoveName | ID, ppUsed: PPState = 1, recursionSource?: PokemonIdent) {
     if (recursionSource === this.originalIdent) return;
+    // a move already remembered by its ID is left as it is when no PP was used
+    if (ppUsed === 0 && !this.volatiles.transform) {
+      for (const entry of this.moveSlots) {
+        if (entry.id === moveName && entry.virtual === false) return;
+      }
+    }
     const move = this.side.battle.get('moves', moveName);
     if (move.name === 'Struggle') return;
     let virtual = false;
