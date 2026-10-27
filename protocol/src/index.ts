@@ -1903,6 +1903,9 @@ export const ignoreKwArgsSimple = new Set(['chatmsg', 'chatmsg-raw', 'raw', 'err
   'pagehtml', 'fieldhtml', 'controlshtml', 'bigerror', 'debug', 'tier',
   'challstr', 'popup', '', 'customgroups', 'notify']);
 
+// the keys of commands in Protocol.ARGS, so they aren't rebuilt for every line
+const KEYS = new Map<string, Protocol.ArgName>();
+
 export const Protocol = new class {
   // NOTE: An object is used here to get TypeScript to perform exhaustiveness checking
   ARGS: {[k in Protocol.ArgName]: 1} = {
@@ -1966,10 +1969,16 @@ export const Protocol = new class {
   }
 
   key(args: Protocol.ArgType, raw = false): Protocol.ArgName | undefined {
-    const key = (args[0] === 'tournament'
-      ? `|${args[0]}|${args[1]}|`
-      : `|${args[0]}|`) as Protocol.ArgName;
-    return (raw || key in this.ARGS) ? key : undefined;
+    if (args[0] === 'tournament') {
+      const key = `|${args[0]}|${args[1]}|` as Protocol.ArgName;
+      return (raw || key in this.ARGS) ? key : undefined;
+    }
+    let key = KEYS.get(args[0]);
+    if (key) return key;
+    key = `|${args[0]}|` as Protocol.ArgName;
+    if (key in this.ARGS) KEYS.set(args[0], key);
+    else if (!raw) return undefined;
+    return key;
   }
 
   parseLine(line: string, noDefault?: boolean): Protocol.ArgType | null {
