@@ -624,7 +624,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
 
   rememberAbility(ability: string, isNotBase?: boolean) {
     this.ability = this.side.battle.get('abilities', ability).id;
-    if (!this.baseAbility && !isNotBase) {
+    // a transformed Pokemon shows the ability it copied, not its own
+    if (!this.baseAbility && !isNotBase && !this.volatiles.transform) {
       this.baseAbility = this.ability;
     }
   }

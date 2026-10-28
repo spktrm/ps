@@ -140,4 +140,20 @@ describe('Handler', () => {
     expect(kyurem.volatiles.gastroacid).toBeUndefined();
     expect(kyurem.ability).toBe('pressure');
   });
+
+  it('|-transform|', () => {
+    const battle = play(4, [
+      '|switch|p1a: Articuno|Articuno, L50|166/166', '|switch|p2a: Ditto|Ditto, L50|124/124',
+      '|-ability|p1a: Articuno|Pressure', '|turn|1',
+      '|move|p2a: Ditto|Transform|p1a: Articuno', '|-transform|p2a: Ditto|p1a: Articuno',
+      '|-ability|p2a: Ditto|Pressure',
+    ]);
+    const ditto = battle.p2.active[0]!;
+    expect(ditto.ability).toBe('pressure');
+    expect(ditto.baseAbility).toBeFalsy();
+
+    // Transform's copy ends when Ditto leaves
+    battle.add('|switch|p2a: Blissey|Blissey, L50, F|331/331');
+    expect(ditto.ability).toBeFalsy();
+  });
 });
