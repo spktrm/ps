@@ -644,6 +644,8 @@ export class Handler implements Protocol.Handler {
     const ability = this.battle.get('abilities', args[2]);
     poke.ability = ''; // '(suppressed)';
     if (ability?.id && !poke.baseAbility) poke.baseAbility = ability.id;
+    // the sim sends this when Gastro Acid's volatile starts
+    poke.addVolatile('gastroacid' as ID);
   }
 
   '|detailschange|'(args: Args['|detailschange|']) {

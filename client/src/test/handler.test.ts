@@ -124,4 +124,20 @@ describe('Handler', () => {
     rest.add('|-status|p1a: Snorlax|slp|[from] move: Rest');
     expect(snorlax.statusState.sleepTurns).toBe(0);
   });
+
+  it('|-endability|', () => {
+    const battle = play(9, [
+      '|switch|p1a: Mew|Mew|100/100', '|switch|p2a: Kyurem|Kyurem|100/100',
+      '|-ability|p2a: Kyurem|Pressure',
+      '|turn|1',
+      '|move|p1a: Mew|Gastro Acid|p2a: Kyurem', '|-endability|p2a: Kyurem',
+    ]);
+    const kyurem = battle.p2.active[0]!;
+    expect(kyurem.volatiles.gastroacid).toBeDefined();
+    expect(kyurem.effectiveAbility()).toBe('');
+
+    battle.add('|switch|p2a: Snorlax|Snorlax, M|100/100');
+    expect(kyurem.volatiles.gastroacid).toBeUndefined();
+    expect(kyurem.ability).toBe('pressure');
+  });
 });
