@@ -273,29 +273,31 @@ export class Handler implements Protocol.Handler {
     const damage = poke.healthParse(args[2]);
     if (damage === null) return;
 
-    if (fromEffect) {
-      const ofpoke = this.battle.getPokemon(kwArgs.of);
-      (ofpoke || poke).activateAbility(fromEffect);
-      if (fromEffect.kind === 'Item' &&
-        !CONSUMED.includes(poke.lastItemEffect as LastItemEffect) &&
-        poke.lastItem !== fromEffect.id) {
-        poke.item = fromEffect.id;
-      }
-      if (revival) {
-        poke.fainted = false;
-        poke.status = undefined;
-      }
-      if (fromEffect.id !== 'lunardance' && fromEffect.id !== 'healingwish') return;
-      if (fromEffect.id === 'lunardance') {
+    // moves, Leech Seed, Rest and Z-Moves heal without a [from]
+    if (!fromEffect) return;
+
+    const ofpoke = this.battle.getPokemon(kwArgs.of);
+    (ofpoke || poke).activateAbility(fromEffect);
+    if (fromEffect.kind === 'Item' &&
+      !CONSUMED.includes(poke.lastItemEffect as LastItemEffect) &&
+      poke.lastItem !== fromEffect.id) {
+      poke.item = fromEffect.id;
+    }
+    switch (fromEffect.id) {
+      case 'lunardance':
         for (const moveSlot of poke.moveSlots) {
           moveSlot.ppUsed = 0;
         }
-      }
+        // falls through
+      case 'healingwish':
+        this.battle.lastMove = 'healing-wish';
+        poke.side.wisher = null;
+        break;
+      case 'revivalblessing':
+        poke.fainted = false;
+        poke.setStatus(undefined);
+        break;
     }
-    this.battle.lastMove = 'healing-wish';
-    poke.side.wisher = null;
-    poke.statusState.sleepTurns = 0;
-    poke.statusState.toxicTurns = 0;
   }
 
   '|-sethp|'(args: Args['|-sethp|']) {
@@ -464,17 +466,14 @@ export class Handler implements Protocol.Handler {
     const fromEffect = this.battle.get('conditions', kwArgs.from);
     const ofpoke = this.battle.getPokemon(kwArgs.of) || poke;
 
-    poke.status = status;
+    // a new status starts its counters again, as does Gen 2 Rest through Sleep Talk
+    poke.setStatus(status);
     poke.removeVolatile('yawn' as ID);
     ofpoke.activateAbility(fromEffect);
 
     if (fromEffect?.kind === 'Item') ofpoke.item = fromEffect.id;
 
-    if (status === 'tox') {
-      poke.statusState.toxicTurns = (fromEffect?.name === 'Toxic Orb' ? -1 : 0);
-    } else if (status === 'slp' && fromEffect?.id === 'rest') {
-      poke.statusState.sleepTurns = 0; // for Gen 2 use through Sleep Talk
-    }
+    if (status === 'tox' && fromEffect?.name === 'Toxic Orb') poke.statusState.toxicTurns = -1;
   }
 
   '|-curestatus|'(args: Args['|-curestatus|']) {
@@ -482,11 +481,9 @@ export class Handler implements Protocol.Handler {
     const status = args[2];
     // TODO: confusion its own case and default the rest?
     if (poke) {
-      poke.status = undefined;
+      poke.setStatus(undefined);
       switch (status) {
-        case 'brn': case 'par': case 'frz': break;
-        case 'tox': case 'psn': return void (poke.statusState.toxicTurns = 0);
-        case 'slp': return void (poke.statusState.sleepTurns = 0);
+        case 'brn': case 'par': case 'frz': case 'tox': case 'psn': case 'slp': break;
         default: return poke.removeVolatile('confusion' as ID);
       }
     }
@@ -496,7 +493,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     // For old gens when the whole team was always cured
     for (const target of poke.side.team) {
-      target.status = undefined;
+      target.setStatus(undefined);
     }
   }
 

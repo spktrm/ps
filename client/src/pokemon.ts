@@ -298,11 +298,21 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
 
   healthParse(hpstring: string) {
     const oldmaxhp = this.maxhp;
+    const oldstatus = this.status;
     const health = Pokemon.parseHealth(hpstring, this);
     // baseMaxhp differs from maxhp after Dynamax, but a Pokemon will always be initialized
     // in its base form first before Dynamax and so the first maxhp value we see is the base
     if (oldmaxhp === 0) this.baseMaxhp = this.maxhp;
+    // a status the HP string starts or ends takes its counters with it
+    if (this.status !== oldstatus) this.setStatus(this.status);
     return health;
+  }
+
+  /** Sets the status and restarts its sleep and toxic counters, as the sim does. */
+  setStatus(status?: StatusName) {
+    this.status = status;
+    this.statusState.sleepTurns = 0;
+    this.statusState.toxicTurns = 0;
   }
 
   static parseHealth(

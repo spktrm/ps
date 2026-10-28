@@ -135,7 +135,7 @@ export class Battle {
           pokemon.hp = p.hp;
           pokemon.maxhp = p.maxhp;
           if (p.hpcolor) pokemon.hpcolor = p.hpcolor;
-          pokemon.status = p.status;
+          if (pokemon.status !== p.status) pokemon.setStatus(p.status);
           pokemon.fainted = !!p.fainted;
           for (const move of p.moves) {
             pokemon.rememberMove(move, 0);
