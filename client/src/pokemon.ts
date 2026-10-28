@@ -437,18 +437,21 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
         ppUsed[1] += pp[1];
       }
     }
+    // Pressure on a move's last PP takes only what is left
+    const move = this.side.battle.gen.moves.get(entry[0]);
+    let maxpp = !move ? Infinity : (move.pp === 1 || move.noPPBoosts ? move.pp : move.pp * 8 / 5);
+    if (move && this.side.battle.tier.includes('Champions')) {
+      maxpp = move.pp > 20 ? 20 : move.pp;
+      maxpp = move.pp === 1 || move.noPPBoosts ? move.pp : (move.pp / 5 + 1) * 4;
+    }
     if (typeof ppUsed === 'number') {
       if (ppUsed < 0) ppUsed = 0;
+      if (ppUsed > maxpp) ppUsed = maxpp;
     } else {
       if (ppUsed[0] < 0) ppUsed[0] = 0;
       if (ppUsed[1] < 0) ppUsed[1] = 0;
-      const move = this.side.battle.gen.moves.get(entry[0])!;
-      let maxpp = (move.pp === 1 || move.noPPBoosts ? move.pp : move.pp * 8 / 5);
-      if (this.side.battle.tier.includes('Champions')) {
-        maxpp = move.pp > 20 ? 20 : move.pp;
-        maxpp = move.pp === 1 || move.noPPBoosts ? move.pp : (move.pp / 5 + 1) * 4;
-      }
       if (ppUsed[0] > maxpp) ppUsed[0] = maxpp;
+      if (ppUsed[1] > maxpp) ppUsed[1] = maxpp;
       if (ppUsed[0] < ppUsed[1]) ppUsed[0] = ppUsed[1];
       if (ppUsed[0] === ppUsed[1]) ppUsed = ppUsed[0];
     }
@@ -493,12 +496,17 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     if (fromeffect?.id === 'sleeptalk') {
       this.rememberMove(move.name, 0);
     }
+    const gen = this.side.battle.gen;
+    const caller = fromeffect.id ? gen.moves.get(fromeffect.id) : undefined;
     let callerMoveForPressure = null;
     // will not include effects that are conditions named after moves like Magic Coat and Snatch
-    if (fromeffect.id && from!.startsWith('move:')) {
+    if (fromeffect.id && fromeffect.id !== move.id &&
+      // Gen 3 drops the prefix, but only the conditions' moves have a condition
+      (from!.startsWith('move:') || (gen.num === 3 && caller && !caller.condition))) {
       callerMoveForPressure = fromeffect as Move;
     }
-    if (!fromeffect.id || callerMoveForPressure || fromeffect.id === 'pursuit') {
+    // Pursuit hitting a switching foe names itself
+    if (!fromeffect.id || callerMoveForPressure || fromeffect.id === move.id) {
       let moveName = move.name;
       if (!callerMoveForPressure) {
         // const previousLine = this.stepQueue[this.currentStep - 1];
@@ -521,35 +529,11 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
         }
       }
       // 1 pp was already deducted from using the move itself
-      let pp: PPState = callerMoveForPressure ? 0 : 1;
-      if ((this.side.battle.abilityActive(['pressure'] as ID[]) ||
-      this.side.battle.gen.num === 3) &&
-        move.id !== 'stickyweb') {
-        const foeTargets = [];
-        const moveTarget = (move.pressureTarget || move.target)!;
-        const singles = [
-          'self', 'allies', 'allySide', 'adjacentAlly', 'adjacentAllyOrSelf', 'allyTeam',
-        ];
-        const ffa = ['all', 'allAdjacent', 'allAdjacentFoes', 'foeSide'];
-        if (!target && this.side.battle.gameType === 'singles' && !singles.includes(moveTarget)) {
-          // Hardcode for moves without a target in singles
-          foeTargets.push(this.side.foe.active[0]);
-        } else if (ffa.includes(moveTarget)) {
-          for (const active of this.side.battle.getAllActive()) {
-            if (active === this) continue;
-            // Pressure affects allies in gen 3 and 4
-            if (this.side.battle.gen.num <= 4 ||
-                (active.side !== this.side && active.side.ally !== this.side)) {
-              foeTargets.push(active);
-            }
-          }
-        } else if (target && target.side !== this.side) {
-          foeTargets.push(target);
-        }
-
-        pp = this.getPressurePP(pp, foeTargets.filter(foe => foe && !foe.fainted) as Pokemon[]);
-      }
-      this.rememberMove(callerMoveForPressure ? callerMoveForPressure.name : moveName, pp);
+      const pp: PPState = callerMoveForPressure ? 0 : 1;
+      this.rememberMove(
+        callerMoveForPressure ? callerMoveForPressure.name : moveName,
+        this.getPressurePP(pp, move, target)
+      );
     }
     this.lastMove = move.id;
     this.lastMoveTargetLoc = target
@@ -562,26 +546,91 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       this.side.wisher = this;
     }
   }
-  private getPressurePP(pp: PPState, foes: Pokemon[]) {
-    for (const foe of foes) {
-      const abilities =
-        Object.values(this.side.battle.gen.species.get(foe.speciesForme)!.abilities);
-      const canHavePressure = this.side.battle.gen.num === 3 && abilities.includes('Pressure');
-      if (foe.effectiveAbility() === 'Pressure' || (canHavePressure && abilities.length === 1)) {
-        if (typeof pp === 'number') {
-          pp += 1;
-        } else {
-          pp[0] += 1;
-          pp[1] += 1;
-        }
-      } else if (canHavePressure) {
-        if (typeof pp === 'number') {
-          pp = [pp, pp];
-        }
-        pp[0] += 1;
+  // Adds the PP that Pressure takes, from the Pokemon the sim's getMoveTargets checks for it.
+  private getPressurePP(pp: PPState, move: Partial<Move> & NA, target: Pokemon | null) {
+    const active = this.side.battle.getAllActive();
+    let checked: Pokemon[] = [];
+    let min = 0;
+    let max = 0;
+    if (move.flags?.mustpressure) {
+      checked = active.filter(p => !this.isAlly(p));
+    } else {
+      switch (move.target) {
+        case 'foeSide': break;
+        case 'all': checked = active; break;
+        case 'allySide': case 'allyTeam': case 'allies':
+          checked = active.filter(p => this.isAlly(p));
+          break;
+        case 'allAdjacent': checked = active.filter(p => this.isAdjacent(p)); break;
+        case 'allAdjacentFoes':
+          checked = active.filter(p => !this.isAlly(p) && this.isAdjacent(p));
+          break;
+        default:
+          if (target) {
+            checked = [target];
+            // Dragon Darts also hits the target's ally beside it
+            const ally = move.smartTarget &&
+              active.find(p => p !== target && p !== this && target.isAlly(p) &&
+                target.isAdjacent(p));
+            if (ally) checked.push(ally);
+          } else {
+            // [still] hides the target, so take the range over every Pokemon it could be
+            const ranges = active.filter(p => this.couldTarget(p, move.target!))
+              .map(p => this.pressureOf(p));
+            if (ranges.length) {
+              min = Math.min(...ranges.map(r => r[0]));
+              max = Math.max(...ranges.map(r => r[1]));
+            }
+          }
       }
     }
-    return pp;
+    for (const p of checked) {
+      const [lo, hi] = this.pressureOf(p);
+      min += lo;
+      max += hi;
+    }
+    if (typeof pp === 'number') return min === max ? pp + min : [pp + max, pp + min] as PPState;
+    return [pp[0] + max, pp[1] + min] as PPState;
+  }
+
+  // The PP that p's Pressure adds to this Pokemon's move, as [at least, at most].
+  private pressureOf(p: Pokemon): [number, number] {
+    // Pressure spares the user, and from Gen 5 its allies too
+    if (p.fainted || p === this || (this.side.battle.gen.num >= 5 && this.isAlly(p))) {
+      return [0, 0];
+    }
+    if (p.ability || p.baseAbility) {
+      return p.effectiveAbility() === 'pressure' ? [1, 1] : [0, 0];
+    }
+    // Gen 3 shows Pressure only to its own side
+    if (this.side.battle.gen.num !== 3) return [0, 0];
+    const abilities = Object.values(this.side.battle.gen.species.get(p.speciesForme)!.abilities);
+    if (!abilities.some(a => toID(a) === 'pressure')) return [0, 0];
+    return abilities.length === 1 ? [1, 1] : [0, 1];
+  }
+
+  // Whether a move with this target type could have been aimed at p.
+  private couldTarget(p: Pokemon, moveTarget: MoveTarget) {
+    switch (moveTarget) {
+      case 'self': return p === this;
+      case 'adjacentAllyOrSelf': return p === this || (this.isAlly(p) && this.isAdjacent(p));
+      case 'adjacentAlly': return this.isAlly(p) && this.isAdjacent(p);
+      case 'adjacentFoe': case 'randomNormal': return !this.isAlly(p) && this.isAdjacent(p);
+      case 'normal': return this.isAdjacent(p);
+      default: return p !== this;
+    }
+  }
+
+  isAlly(pokemon: Pokemon) {
+    return this.side === pokemon.side || this.side.ally === pokemon.side;
+  }
+
+  isAdjacent(pokemon: Pokemon) {
+    if (this.fainted || pokemon.fainted) return false;
+    const n = this.side.active.length;
+    if (n <= 2) return this !== pokemon;
+    if (this.side === pokemon.side) return Math.abs(this.slot - pokemon.slot) === 1;
+    return Math.abs(this.slot + pokemon.slot + 1 - n) <= 1;
   }
 
   cantUseMove(

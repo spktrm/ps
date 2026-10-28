@@ -153,7 +153,137 @@ describe('Pokemon', () => {
   });
 
   it.todo('#rememberMove');
-  it.todo('#useMove');
+  it('#useMove', () => {
+    const play = (num: number, lines: string[]) => {
+      const battle = new Battle(gens);
+      for (const line of ['|player|p1|Alice|1|', '|player|p2|Bob|2|', `|gen|${num}`, ...lines]) {
+        battle.add(line);
+      }
+      return battle;
+    };
+    const pp = (battle: Battle, name: string, move: string, side: 'p1' | 'p2' = 'p1') =>
+      battle[side].team.find(p => p.name === name)!.moveSlots.find(m => m.id === move)?.ppUsed;
+
+    // the PP each move took in the sim, from these same lines
+    let battle = play(9, [
+      '|switch|p1a: Mew|Mew, L50|176/176', '|switch|p2a: Kyurem|Kyurem, L50|201/201',
+      '|-ability|p2a: Kyurem|Pressure', '|turn|1',
+      '|move|p1a: Mew|Tackle|p2a: Kyurem',
+      '|move|p1a: Mew|Swords Dance|p1a: Mew',
+      '|move|p1a: Mew|Stealth Rock|p2a: Kyurem',
+      '|move|p1a: Mew|Sticky Web|p2a: Kyurem',
+      '|move|p1a: Mew|Haze|p1a: Mew',
+      '|move|p1a: Mew|Sucker Punch||[still]', '|-fail|p1a: Mew',
+    ]);
+    expect(pp(battle, 'Mew', 'tackle')).toBe(2);
+    expect(pp(battle, 'Mew', 'swordsdance')).toBe(1);
+    expect(pp(battle, 'Mew', 'stealthrock')).toBe(2);
+    expect(pp(battle, 'Mew', 'stickyweb')).toBe(1);
+    expect(pp(battle, 'Mew', 'haze')).toBe(2);
+    expect(pp(battle, 'Mew', 'suckerpunch')).toBe(2);
+
+    battle = play(9, [
+      '|switch|p1a: Mew|Mew, L50|176/176', '|switch|p2a: Snorlax|Snorlax, L50, F|236/236',
+      '|turn|1', '|move|p1a: Mew|Tackle|p2a: Snorlax',
+      '|switch|p2a: Kyurem|Kyurem, L50|201/201', '|-ability|p2a: Kyurem|Pressure',
+      '|move|p1a: Mew|Gastro Acid|p2a: Kyurem', '|-endability|p2a: Kyurem',
+      '|move|p1a: Mew|Tackle|p2a: Kyurem',
+    ]);
+    expect(pp(battle, 'Mew', 'tackle')).toBe(2);
+    expect(pp(battle, 'Mew', 'gastroacid')).toBe(2);
+
+    // spread moves check every foe beside the user, and the user's ally is spared
+    const doubles = [
+      '|gametype|doubles',
+      '|switch|p1a: Smeargle|Smeargle, L50, M|131/131',
+      '|switch|p1b: Articuno|Articuno, L50|166/166',
+      '|switch|p2a: Kyurem|Kyurem, L50|201/201', '|switch|p2b: Zapdos|Zapdos, L50|166/166',
+      '|-ability|p2b: Zapdos|Pressure', '|-ability|p2a: Kyurem|Pressure',
+      '|-ability|p1b: Articuno|Pressure', '|turn|1',
+      '|move|p1a: Smeargle|Earthquake|p2a: Kyurem|[spread] p2a',
+      '|move|p1a: Smeargle|Rock Slide|p2b: Zapdos|[spread] p2a,p2b',
+      '|move|p1a: Smeargle|Tackle|p1b: Articuno',
+      '|move|p1a: Smeargle|Dragon Darts|p2a: Kyurem',
+    ];
+    battle = play(9, doubles);
+    expect(pp(battle, 'Smeargle', 'earthquake')).toBe(3);
+    expect(pp(battle, 'Smeargle', 'rockslide')).toBe(3);
+    expect(pp(battle, 'Smeargle', 'tackle')).toBe(1);
+    expect(pp(battle, 'Smeargle', 'dragondarts')).toBe(3);
+    // before Gen 5 only the user is spared, but Rock Slide never aims at the ally
+    battle = play(4, [
+      '|gametype|doubles',
+      '|switch|p1a: Smeargle|Smeargle, L50, M|131/131',
+      '|switch|p1b: Articuno|Articuno, L50|166/166',
+      '|switch|p2a: Snorlax|Snorlax, L50, F|236/236',
+      '|switch|p2b: Blissey|Blissey, L50, F|331/331',
+      '|-ability|p1b: Articuno|Pressure', '|turn|1',
+      '|move|p1a: Smeargle|Earthquake|p2b: Blissey|[spread] p2a,p2b',
+      '|move|p1a: Smeargle|Rock Slide|p2b: Blissey|[spread] p2a,p2b',
+      '|move|p1a: Smeargle|Tackle|p1b: Articuno',
+    ]);
+    expect(pp(battle, 'Smeargle', 'earthquake')).toBe(2);
+    expect(pp(battle, 'Smeargle', 'rockslide')).toBe(1);
+    expect(pp(battle, 'Smeargle', 'tackle')).toBe(2);
+
+    // [still] hides which foe was aimed at
+    battle = play(9, [
+      '|gametype|doubles',
+      '|switch|p1a: Smeargle|Smeargle, L50, M|131/131', '|switch|p1b: Mew|Mew, L50|176/176',
+      '|switch|p2a: Kyurem|Kyurem, L50|201/201', '|switch|p2b: Snorlax|Snorlax, L50, F|236/236',
+      '|-ability|p2a: Kyurem|Pressure', '|turn|1',
+      '|move|p1a: Smeargle|Sucker Punch||[still]', '|-fail|p1a: Smeargle',
+    ]);
+    expect(pp(battle, 'Smeargle', 'suckerpunch')).toEqual([2, 1]);
+
+    // Pressure on the last PP takes only what is left
+    battle = play(9, [
+      '|switch|p1a: Lapras|Lapras, L50|200/200', '|switch|p2a: Snorlax|Snorlax, L50, F|236/236',
+      '|turn|1', '|move|p1a: Lapras|Sheer Cold|p2a: Snorlax', '|-miss|p1a: Lapras|p2a: Snorlax',
+      '|switch|p2a: Kyurem|Kyurem, L50|201/201', '|-ability|p2a: Kyurem|Pressure',
+      ...Array(4).fill('|move|p1a: Lapras|Sheer Cold|p2a: Kyurem'),
+    ]);
+    expect(pp(battle, 'Lapras', 'sheercold')).toBe(8);
+
+    // Pursuit on a switching foe still costs its own PP
+    battle = play(4, [
+      '|switch|p1a: Tyranitar|Tyranitar, L50, M|176/176',
+      '|switch|p2a: Dusknoir|Dusknoir, L50, F|121/121', '|-ability|p2a: Dusknoir|Pressure',
+      '|turn|1', '|-activate|p2a: Dusknoir|move: Pursuit',
+      '|move|p1a: Tyranitar|Pursuit|p2a: Dusknoir|[from] move: Pursuit',
+    ]);
+    expect(pp(battle, 'Tyranitar', 'pursuit')).toBe(2);
+
+    // Gen 3 hides Pressure and names Sleep Talk without a prefix, as it does Magic Coat
+    battle = play(3, [
+      '|switch|p1a: Snorlax|Snorlax, L50, M|236/236',
+      '|switch|p2a: Dusclops|Dusclops, L50, F|116/116', '|turn|1',
+      '|move|p1a: Snorlax|Rest|p1a: Snorlax', '|-status|p1a: Snorlax|slp|[from] move: Rest',
+      '|cant|p1a: Snorlax|slp', '|move|p1a: Snorlax|Sleep Talk|p1a: Snorlax',
+      '|move|p1a: Snorlax|Body Slam|p2a: Dusclops|[from] Sleep Talk',
+      '|move|p2a: Dusclops|Magic Coat|p2a: Dusclops', '|-singleturn|p2a: Dusclops|move: Magic Coat',
+      '|move|p1a: Snorlax|Toxic|p2a: Dusclops',
+      '|move|p2a: Dusclops|Toxic|p1a: Snorlax|[from] Magic Coat',
+    ]);
+    expect(pp(battle, 'Snorlax', 'rest')).toBe(1);
+    expect(pp(battle, 'Snorlax', 'sleeptalk')).toBe(2);
+    expect(pp(battle, 'Snorlax', 'bodyslam')).toBe(0);
+    expect(pp(battle, 'Dusclops', 'magiccoat', 'p2')).toBe(1);
+    expect(pp(battle, 'Dusclops', 'toxic', 'p2')).toBeUndefined();
+
+    // an ability shown while transformed was copied, and goes when the Pokemon switches out
+    battle = play(4, [
+      '|switch|p1a: Articuno|Articuno, L50|166/166', '|switch|p2a: Ditto|Ditto, L50|124/124',
+      '|-ability|p1a: Articuno|Pressure', '|turn|1',
+      '|move|p2a: Ditto|Transform|p1a: Articuno', '|-transform|p2a: Ditto|p1a: Articuno',
+      '|-ability|p2a: Ditto|Pressure', '|turn|2',
+      '|switch|p2a: Blissey|Blissey, L50, F|331/331',
+      '|switch|p1a: Snorlax|Snorlax, L50, M|236/236',
+      '|turn|3', '|switch|p2a: Ditto|Ditto, L50|124/124',
+      '|move|p1a: Snorlax|Tackle|p2a: Ditto',
+    ]);
+    expect(pp(battle, 'Snorlax', 'tackle')).toBe(1);
+  });
   it.todo('#cantUseMove');
 
   it('#abilities', () => {
