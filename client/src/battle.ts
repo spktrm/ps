@@ -243,7 +243,10 @@ export class Battle {
         if (sc.maxDuration) sc.maxDuration--;
       }
       for (const poke of side.active) {
-        if (poke?.status === 'tox') poke.statusState.toxicTurns++;
+        // the sim stops the toxic counter at 15 from Gen 3
+        if (poke?.status === 'tox' && (this.gen.num <= 2 || poke.statusState.toxicTurns < 15)) {
+          poke.statusState.toxicTurns++;
+        }
         poke?.clearTurnstatuses();
       }
     }

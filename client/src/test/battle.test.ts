@@ -36,6 +36,32 @@ describe('Battle', () => {
     expect(battle.p1.active[0]!.volatiles.wideguard).toBeUndefined();
   });
 
+  it('#upkeep (toxic)', () => {
+    const toxic = (gen: number, from = '') => {
+      const battle = new Battle(GENS);
+      for (const line of [
+        '|player|p1|Alice|1|', '|player|p2|Bob|2|', `|gen|${gen}`,
+        '|switch|p1a: Blissey|Blissey, F|100/100', '|switch|p2a: Gengar|Gengar, M|100/100',
+        '|turn|1', `|-status|p1a: Blissey|tox${from}`,
+      ]) {
+        battle.add(line);
+      }
+      const counts = [];
+      for (let turn = 2; turn <= 20; turn++) {
+        battle.add('|upkeep');
+        counts.push(battle.p1.active[0]!.statusState.toxicTurns);
+        battle.add(`|turn|${turn}`);
+      }
+      return counts;
+    };
+    const capped = (first: number) => Array.from({length: 19}, (_, i) => Math.min(first + i, 15));
+    // the sim stops at 15 from Gen 3, and Toxic Orb poisons after the turn's toxic damage
+    expect(toxic(9)).toEqual(capped(1));
+    expect(toxic(9, '|[from] item: Toxic Orb')).toEqual(capped(0));
+    expect(toxic(3)).toEqual(capped(1));
+    expect(toxic(2)[18]).toBe(19);
+  });
+
   it('#parsePokemonId', () => {
     const battle = new Battle(GENS);
 
