@@ -234,6 +234,11 @@ export class Battle {
     for (const side of this.sides) {
       for (const id in side.sideConditions) {
         const sc = side.sideConditions[id];
+        // the guards end with the turn's residual, before any replacements switch in
+        if (sc.remove) {
+          side.removeSideCondition(id as ID);
+          continue;
+        }
         if (sc.minDuration) sc.minDuration--;
         if (sc.maxDuration) sc.maxDuration--;
       }

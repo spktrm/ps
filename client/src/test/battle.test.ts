@@ -11,6 +11,31 @@ describe('Battle', () => {
   it.todo('#setTurn');
   it.todo('#updateToxicTurns');
 
+  it('#upkeep', () => {
+    const battle = new Battle(GENS);
+    const add = (lines: string[]) => {
+      for (const line of lines) battle.add(line);
+    };
+    add([
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|doubles', '|gen|9',
+      '|switch|p1a: Armarouge|Armarouge, M|311/311', '|switch|p1b: Scizor|Scizor, F|281/281',
+      '|switch|p2a: Excadrill|Excadrill, M|100/100', '|switch|p2b: Magikarp|Magikarp, F|100/100',
+      '|turn|1',
+      '|move|p1a: Armarouge|Wide Guard|p1a: Armarouge', '|-singleturn|p1a: Armarouge|Wide Guard',
+      '|move|p2a: Excadrill|Rock Slide|p1b: Scizor|[spread]',
+      '|-activate|p1a: Armarouge|move: Wide Guard', '|-activate|p1b: Scizor|move: Wide Guard',
+      '|move|p1b: Scizor|U-turn|p2b: Magikarp', '|-damage|p2b: Magikarp|2/100',
+    ]);
+    // U-turn's switch request comes here, mid-turn, while the guard still stands
+    expect(battle.p1.sideConditions.wideguard).toBeDefined();
+    add(['|switch|p1b: Pikachu|Pikachu, F|211/211|[from] U-turn']);
+    expect(battle.p1.sideConditions.wideguard).toBeDefined();
+
+    add(['|', '|upkeep']);
+    expect(battle.p1.sideConditions.wideguard).toBeUndefined();
+    expect(battle.p1.active[0]!.volatiles.wideguard).toBeUndefined();
+  });
+
   it('#parsePokemonId', () => {
     const battle = new Battle(GENS);
 
