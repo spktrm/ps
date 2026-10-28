@@ -280,7 +280,9 @@ export class Battle {
     for (let i = 0; i < side.team.length; i++) {
       let pokemon = side.team[i];
 
-      if (pokemon.ability === 'illusion' || pokemon.baseAbility === 'illusion') {
+      // one that has fainted or stands in another slot can't be switching in here
+      if ((pokemon.ability === 'illusion' || pokemon.baseAbility === 'illusion') &&
+        !pokemon.fainted && (!side.active.includes(pokemon) || side.active[slot] === pokemon)) {
         hasIllusion.push(pokemon);
       }
 
@@ -307,10 +309,10 @@ export class Battle {
       }
     }
 
-    // If we have a request, we know the team is being accurately tracked after Team Preview and
-    // thus hasIllusion will be accurate. However, the current request is stale, so we can't just
-    // assume the request has the correct info at the slot
-    if (this.request && hasIllusion.length) {
+    // If we have a request for this side, we know its team is being accurately tracked after Team
+    // Preview and thus hasIllusion will be accurate. However, the current request is stale, so we
+    // can't just assume the request has the correct info at the slot
+    if (this.request?.side && this.getSide(this.request.side.id) === side && hasIllusion.length) {
       const detailed = Protocol.parseDetails(name, pokemonid as PokemonIdent, details);
       let pokemon: Pokemon | undefined;
       for (const p of hasIllusion) {

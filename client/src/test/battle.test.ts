@@ -82,7 +82,49 @@ describe('Battle', () => {
     expect(p.pokemonid).toBe('p3: Foo');
   });
 
-  it.todo('#getSwitchedPokemon');
+  it('#getSwitchedPokemon', () => {
+    // a disguised Zoroark stands at p2b and the Rillaboom it poses as comes in at p2a
+    const battle = new Battle(GENS);
+    const add = (lines: string[]) => {
+      for (const line of lines) battle.add(line);
+    };
+    const member = (name: string, details: string, hp: string, ability: string) => ({
+      ident: `p1: ${name}`, details, condition: `${hp}/${hp}`, active: true, moves: ['protect'],
+      stats: {atk: 80, def: 80, spa: 80, spd: 80, spe: 80}, baseAbility: ability, item: '',
+    });
+    const request = {wait: true, side: {name: 'Alice', id: 'p1', pokemon: [
+      member('Slowbro', 'Slowbro, L50, M', '170', 'regenerator'),
+      member('Audino', 'Audino, L50, F', '178', 'regenerator'),
+    ]}};
+    add([
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|doubles', '|gen|9', '|clearpoke',
+      '|poke|p1|Slowbro, L50, M|', '|poke|p1|Audino, L50, F|', '|poke|p2|Incineroar, L50, M|',
+      '|poke|p2|Zoroark-Hisui, L50, M|', '|poke|p2|Rillaboom, L50, M|', '|teampreview|2',
+      '|teamsize|p1|2', '|teamsize|p2|3', '|start',
+      '|switch|p1a: Slowbro|Slowbro, L50, M|170/170', '|switch|p1b: Audino|Audino, L50, F|178/178',
+      '|switch|p2a: Incineroar|Incineroar, L50, M|100/100',
+      '|switch|p2b: Rillaboom|Rillaboom, L50, M|100/100',
+      `|request|${JSON.stringify(request)}`, '|turn|1',
+    ]);
+    // as an open team sheet shows it
+    battle.p2.team.find(p => p.speciesForme === 'Zoroark-Hisui')!.rememberAbility('Illusion');
+    add([
+      '|move|p2a: Incineroar|Parting Shot|p1a: Slowbro', '|-unboost|p1a: Slowbro|atk|1',
+      '|switch|p2a: Rillaboom|Rillaboom, L50, M|100/100|[from] Parting Shot',
+      '|move|p1a: Slowbro|Scald|p2b: Rillaboom', '|-damage|p2b: Rillaboom|90/100',
+      '|replace|p2b: Zoroark|Zoroark-Hisui, L50, M', '|-end|p2b: Zoroark|Illusion',
+      '|', '|upkeep', '|turn|2',
+      '|move|p1a: Slowbro|Scald|p2a: Rillaboom', '|-damage|p2a: Rillaboom|0 fnt',
+      '|faint|p2a: Rillaboom',
+      '|move|p1b: Audino|Flamethrower|p2b: Zoroark', '|-damage|p2b: Zoroark|50/100',
+    ]);
+
+    const zoroark = battle.p2.active[1]!;
+    expect(zoroark.speciesForme).toBe('Zoroark-Hisui');
+    expect(zoroark.hp).toBe(50);
+    expect(battle.p2.active[0]).toBeNull();
+    expect(battle.p2.team.filter(p => p.fainted).map(p => p.speciesForme)).toEqual(['Rillaboom']);
+  });
   it.todo('#rememberTeamPreviewPokemon');
   it.todo('#findCorrespondingPokemon');
 
