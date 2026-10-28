@@ -175,8 +175,10 @@ export class Side {
             if (curPoke === poke) continue;
             if (curPoke.fainted) continue;
             if (this.active.includes(curPoke)) continue;
-            if (['Zoroark', 'Zorua'].includes(curPoke.speciesForme) ||
-              curPoke.ability === 'Illusion') {
+            const abilities =
+              Object.values(this.battle.gen.species.get(curPoke.speciesForme)?.abilities ?? {});
+            if (curPoke.ability === 'illusion' || curPoke.baseAbility === 'illusion' ||
+              abilities.some(a => toID(a) === 'illusion')) {
               illusionFound = curPoke;
               break;
             }

@@ -1,4 +1,5 @@
-import {Effect, ID} from '@pkmn/dex';
+import {Generations} from '@pkmn/data';
+import {Dex, Effect, ID} from '@pkmn/dex';
 import {DetailedPokemon, Protocol} from '@pkmn/protocol';
 
 import {Battle, Side} from '../index';
@@ -35,7 +36,26 @@ describe('Side', () => {
     expect(side.sideConditions['tailwind']).toBeUndefined();
   });
 
-  it.todo('#addPokemon');
+  it('#addPokemon', () => {
+    const battle = new Battle(new Generations(Dex));
+    battle.add('|gen|9');
+    const side = battle.p2;
+    side.totalPokemon = 3;
+    const add = (name: string) => side.addPokemon({
+      ident: `p2: ${name}`, name, speciesForme: name, details: name,
+      searchid: `p2: ${name}|${name}`,
+    } as DetailedPokemon);
+    add('Snorlax');
+    const zoroark = add('Zoroark-Hisui');
+    const kyurem = add('Kyurem');
+    kyurem.fainted = true;
+
+    // a second Kyurem means the fainted one was the Illusion user, even unrevealed
+    add('Kyurem');
+    expect(side.team).toHaveLength(3);
+    expect(zoroark.fainted).toBe(true);
+    expect(side.team.find(p => p.name === 'Snorlax')!.fainted).toBe(false);
+  });
 
   it('#switchIn', () => {
     const side = new Side({gen: {num: 8}} as Battle, 0);
