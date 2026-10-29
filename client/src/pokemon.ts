@@ -67,6 +67,19 @@ function subtractPP(a: PPState, b: PPState): PPState {
   return a0 - b0 === a1 - b1 ? a0 - b0 : [a0 - b0, a1 - b1];
 }
 
+// the sim's onModifyType handlers: abilities that retype Normal moves, and moves of varying type
+const ATE: {[ability: string]: TypeName} = {
+  aerilate: 'Flying', dragonize: 'Dragon', galvanize: 'Electric',
+  pixilate: 'Fairy', refrigerate: 'Ice',
+};
+const VARIABLE_TYPE = new Set([
+  'aurawheel', 'hiddenpower', 'ivycudgel', 'judgment', 'multiattack', 'naturalgift', 'ragingbull',
+  'revelationdance', 'technoblast', 'terablast', 'terastarstorm', 'terrainpulse', 'weatherball',
+]);
+
+// move ids that are Z-Moves or Max Moves, which they are in every generation
+const Z_OR_MAX = new Map<string, Move | null>();
+
 const VOLATILES = [
   'airballoon', 'attract', 'autotomize', 'disable', 'encore', 'foresight', 'gmaxchistrike',
   'imprison', 'laserfocus', 'mimic', 'miracleeye', 'nightmare', 'saltcure', 'smackdown',
@@ -556,6 +569,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       }
     }
     this.moveSlots.push({id: move.id, name: move.name as MoveName, ppUsed, virtual});
+    // only a new move can show which move a Z-Move or Max Move came from
+    this.resolveBaseMoves();
   }
 
   useMove(
@@ -620,6 +635,67 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       this.side.wisher = this;
     }
   }
+  // Moves PP charged to a Z-Move or Max Move onto the move it came from, once that is certain.
+  private resolveBaseMoves() {
+    for (let i = 0; i < this.moveSlots.length; i++) {
+      const slot = this.moveSlots[i];
+      const move = !slot.virtual && this.zOrMaxMove(slot.id);
+      if (!move) continue;
+      const bases = this.baseMovesOf(move);
+      if (!bases) continue;
+      this.moveSlots.splice(i--, 1);
+      // when several could have been the base, each may have taken all of it or none
+      const most = typeof slot.ppUsed === 'number' ? slot.ppUsed : slot.ppUsed[0];
+      const pp: PPState = bases.length === 1 ? slot.ppUsed : [most, 0];
+      for (const base of bases) base.ppUsed = this.mergePP([base.name, base.ppUsed], pp);
+    }
+  }
+
+  // The moves the sim could have turned into this Z-Move or Max Move, if no unknown move could.
+  private baseMovesOf(move: Move) {
+    const gen = this.side.battle.gen;
+    const real = this.moveSlots.filter(s => !s.virtual && !this.zOrMaxMove(s.id) &&
+      gen.moves.get(s.id));
+    // the request says which of its moves becomes which
+    const own = move.isZ ? this.zMoves : this.maxMoves;
+    if (own?.length === real.length) {
+      const bases = real.filter((_, i) => own[i]?.id === move.id);
+      if (bases.length) return bases;
+    }
+    // otherwise only a full moveset is sure to hold it
+    if (real.length < 4) return undefined;
+    const status = move.id === 'maxguard';
+    const type = move.isZ ? gen.items.get(move.isZ as string)?.zMoveType : move.type;
+    const bases = real.filter(slot => {
+      const base = gen.moves.get(slot.id)!;
+      if ((base.category === 'Status') !== status) return false;
+      return status || (!!type && this.couldBeType(base, type, !!move.isMax));
+    });
+    return bases.length ? bases : undefined;
+  }
+
+  // A Z-Move or Max Move, including G-Max moves, which @pkmn/data leaves out as nonstandard.
+  private zOrMaxMove(id: ID) {
+    let move = Z_OR_MAX.get(id);
+    if (move === undefined) {
+      const found = this.side.battle.gen.dex.moves.get(id);
+      move = found.exists && (found.isZ || found.isMax) ? found : null;
+      Z_OR_MAX.set(id, move);
+    }
+    return move ?? undefined;
+  }
+
+  // Whether the sim could give this move this type as it becomes a Z-Move or Max Move.
+  private couldBeType(move: Move, type: TypeName, max: boolean) {
+    if (move.type === type || VARIABLE_TYPE.has(move.id)) return true;
+    if (!max) return false;
+    const known = this.ability || this.baseAbility;
+    const abilities = known ? [known] : Object.values(this.species.abilities).map(toID);
+    return abilities.some(a => (move.type === 'Normal' && ATE[a] === type) ||
+      (a === 'normalize' && type === 'Normal') ||
+      (a === 'liquidvoice' && type === 'Water' && !!move.flags.sound));
+  }
+
   // Adds the PP that Pressure takes, from the Pokemon the sim's getMoveTargets checks for it.
   private getPressurePP(pp: PPState, move: Partial<Move> & NA, target: Pokemon | null) {
     const active = this.side.battle.getAllActive();

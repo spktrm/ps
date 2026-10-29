@@ -152,7 +152,86 @@ describe('Pokemon', () => {
     expect(pokemon.statusState.sleepTurns).toBe(4);
   });
 
-  it.todo('#rememberMove');
+  it('#rememberMove', () => {
+    const play = (num: number, lines: string[]) => {
+      const battle = new Battle(gens);
+      for (const line of [
+        '|player|p1|Alice|1|', '|player|p2|Bob|2|', `|gen|${num}`,
+        '|switch|p2a: Blissey|Blissey, F|100/100', ...lines,
+      ]) {
+        battle.add(line);
+      }
+      return battle;
+    };
+    const moves = (battle: Battle) =>
+      Object.fromEntries(battle.p1.active[0]!.moveSlots.map(m => [m.id, m.ppUsed]));
+
+    // a Z-Move's PP stays on it until a full moveset shows which move it came from
+    let battle = play(7, [
+      '|switch|p1a: Celebi|Celebi|100/100', '|turn|1',
+      '|-zpower|p1a: Celebi', '|move|p1a: Celebi|Bloom Doom|p2a: Blissey|[zeffect]',
+      '|move|p1a: Celebi|Psychic|p2a: Blissey', '|move|p1a: Celebi|Recover|p1a: Celebi',
+      '|move|p1a: Celebi|Nasty Plot|p1a: Celebi',
+    ]);
+    expect(moves(battle)).toEqual({bloomdoom: 1, psychic: 1, recover: 1, nastyplot: 1});
+    battle.add('|move|p1a: Celebi|Leaf Storm|p2a: Blissey');
+    expect(moves(battle)).toEqual({psychic: 1, recover: 1, nastyplot: 1, leafstorm: 2});
+    // with two Grass moves either could have been it
+    battle = play(7, [
+      '|switch|p1a: Celebi|Celebi|100/100', '|turn|1',
+      '|-zpower|p1a: Celebi', '|move|p1a: Celebi|Bloom Doom|p2a: Blissey|[zeffect]',
+      '|move|p1a: Celebi|Giga Drain|p2a: Blissey', '|move|p1a: Celebi|Recover|p1a: Celebi',
+      '|move|p1a: Celebi|Nasty Plot|p1a: Celebi', '|move|p1a: Celebi|Leaf Storm|p2a: Blissey',
+    ]);
+    expect(moves(battle)).toEqual({gigadrain: [2, 1], recover: 1, nastyplot: 1, leafstorm: [2, 1]});
+
+    // the request says which moves become which Z-Move
+    battle = play(7, ['|switch|p1a: Celebi|Celebi, L50|176/176']);
+    battle.update(Protocol.parseRequest(JSON.stringify({
+      active: [{
+        moves: [
+          {move: 'Leaf Storm', id: 'leafstorm', pp: 8, maxpp: 8, target: 'normal', disabled: false},
+          {move: 'Psychic', id: 'psychic', pp: 16, maxpp: 16, target: 'normal', disabled: false},
+          {move: 'Recover', id: 'recover', pp: 16, maxpp: 16, target: 'self', disabled: false},
+        ],
+        canZMove: [{move: 'Bloom Doom', target: 'normal'}, null, null],
+      }],
+      side: {name: 'Alice', id: 'p1', pokemon: [{
+        ident: 'p1: Celebi', details: 'Celebi, L50', condition: '176/176', active: true,
+        stats: {atk: 120, def: 120, spa: 120, spd: 120, spe: 120},
+        moves: ['leafstorm', 'psychic', 'recover'], baseAbility: 'naturalcure',
+        item: 'grassiumz', pokeball: 'pokeball', ability: 'naturalcure',
+      }]},
+    }) as Protocol.RequestJSON));
+    battle.add('|-zpower|p1a: Celebi');
+    battle.add('|move|p1a: Celebi|Bloom Doom|p2a: Blissey|[zeffect]');
+    expect(moves(battle)).toEqual({leafstorm: 1, psychic: 0, recover: 0});
+
+    // Max Guard comes from any status move, Pixilate makes Hyper Voice Max Starfall,
+    // and G-Max moves count though @pkmn/data leaves them out
+    battle = play(8, [
+      '|switch|p1a: Sylveon|Sylveon, F|100/100', '|turn|1',
+      '|-start|p1a: Sylveon|Dynamax|', '|move|p1a: Sylveon|Max Guard|p1a: Sylveon',
+      '|move|p1a: Sylveon|Max Starfall|p2a: Blissey', '|-end|p1a: Sylveon|Dynamax',
+      '|move|p1a: Sylveon|Wish|p1a: Sylveon', '|move|p1a: Sylveon|Protect|p1a: Sylveon',
+      '|move|p1a: Sylveon|Hyper Voice|p2a: Blissey',
+    ]);
+    expect(moves(battle)).toEqual({
+      maxguard: 1, maxstarfall: 1, wish: 1, protect: 1, hypervoice: 1,
+    });
+    battle.add('|move|p1a: Sylveon|Mystical Fire|p2a: Blissey');
+    expect(moves(battle)).toEqual({
+      wish: [2, 1], protect: [2, 1], hypervoice: 2, mysticalfire: 1,
+    });
+    battle = play(8, [
+      '|switch|p1a: Alcremie|Alcremie, F|100/100', '|turn|1',
+      '|-start|p1a: Alcremie|Dynamax|Gmax', '|move|p1a: Alcremie|G-Max Finale|p2a: Blissey',
+      '|-end|p1a: Alcremie|Dynamax', '|move|p1a: Alcremie|Dazzling Gleam|p2a: Blissey',
+      '|move|p1a: Alcremie|Mystical Fire|p2a: Blissey', '|move|p1a: Alcremie|Recover|p1a: Alcremie',
+      '|move|p1a: Alcremie|Calm Mind|p1a: Alcremie',
+    ]);
+    expect(moves(battle)).toEqual({dazzlinggleam: 2, mysticalfire: 1, recover: 1, calmmind: 1});
+  });
   it('#useMove', () => {
     const play = (num: number, lines: string[]) => {
       const battle = new Battle(gens);
