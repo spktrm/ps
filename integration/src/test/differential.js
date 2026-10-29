@@ -52,7 +52,7 @@ class Differential {
   constructor(options = {}) {
     this.sim = simulator(options.sim);
     this.client = require(options.client ? path.resolve(options.client) : '@pkmn/client');
-    // @pkmn/dex, as the client is used: @pkmn/sim's Dex prefixes ability and item effect ids
+    // @pkmn/dex, as the client is usually used (@pkmn/sim's Dex plays the same)
     this.gens = new Generations(require('@pkmn/dex').Dex);
     this.num = options.num || 250;
     this.offset = options.offset || 0;

@@ -21,6 +21,24 @@ describe('client', () => {
     }
   });
 
+  it('effects', () => {
+    const gens = {sim: new Generations(Dex), dex: new Generations(require('@pkmn/dex').Dex)};
+    for (let num = 1; num <= 9; num++) {
+      const battles = {sim: new Battle(gens.sim), dex: new Battle(gens.dex)};
+      for (const b of Object.values(battles)) b.gen = b.gens.get(num);
+      const gen = battles.dex.gen;
+      const names = [
+        ...Array.from(gen.abilities, a => `ability: ${a.name}`),
+        ...Array.from(gen.items, i => `item: ${i.name}`),
+        ...Array.from(gen.moves, m => `move: ${m.name}`),
+      ];
+      for (const name of names) {
+        const [s, d] = [battles.sim, battles.dex].map(b => b.get('conditions', name));
+        expect([name, s.id, s.kind]).toEqual([name, d.id, d.kind]);
+      }
+    }
+  });
+
   it('fixtures', () => {
     for (const name of fs.readdirSync(`${__dirname}/fixtures/input`)) {
       if (SKIPPED.has(name)) continue;
