@@ -687,6 +687,9 @@ export class Battle {
 			relayVar = true;
 			hasRelayVar = false;
 		}
+		// effects that don't handle this event have nothing to suppress
+		const callback = customCallback || (effect as any)[`on${eventid}`];
+		if (callback === undefined) return relayVar;
 
 		if (effect.effectType === 'Status' && (target instanceof Pokemon) && target.status !== effect.id) {
 			// it's changed; call it off
@@ -713,9 +716,6 @@ export class Battle {
 			this.debug(eventid + ' handler suppressed by Air Lock');
 			return relayVar;
 		}
-
-		const callback = customCallback || (effect as any)[`on${eventid}`];
-		if (callback === undefined) return relayVar;
 
 		const parentEffect = this.effect;
 		const parentEffectState = this.effectState;
@@ -1313,8 +1313,10 @@ export class Battle {
 		let callback;
 		for (const id in field.pseudoWeather) {
 			const pseudoWeatherState = field.pseudoWeather[id];
-			const pseudoWeather = this.dex.conditions.getByID(id as ID);
-			callback = this.getCallback(field, pseudoWeather, callbackName, callbacks);
+			// rules with event handlers are added as pseudo-weathers too, and only have callbacks some rule defines
+			const pseudoWeather = this.dex.conditions.getByID(id as ID) as Effect;
+			callback = pseudoWeather.effectType !== 'Rule' || formatCallbackNames.has(callbackName) ?
+				this.getCallback(field, pseudoWeather, callbackName, callbacks) : undefined;
 			if (callback !== undefined || (getKey && pseudoWeatherState[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: pseudoWeather, callback, state: pseudoWeatherState,
@@ -1888,6 +1890,8 @@ export class Battle {
 								continue;
 							}
 							const ability = this.dex.abilities.get(abilityName);
+							// only abilities like Shadow Tag can trap
+							if (!(ability as any).onFoeMaybeTrapPokemon) continue;
 							if (ruleTable.has('-ability:' + ability.id)) continue;
 							this.singleEvent('FoeMaybeTrapPokemon', ability, {}, pokemon, source);
 						}
