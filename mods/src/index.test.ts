@@ -176,6 +176,33 @@ for (const [pkg, Dex] of Object.entries(DATA)) {
         expect(dex.items.get('Ability Shield').isNonstandard).toBe('Past');
         expectFormat(dex, 'gen9championsvgc2026regmb');
       });
+      it('restores a battle on its own dex', async () => {
+        if (pkg !== 'sim') return;
+        const dex = Dex.mod('champions' as ID, await import('./champions') as ModData) as
+          unknown as typeof sim.Dex;
+        const stats = {hp: 2, atk: 2, def: 2, spa: 2, spd: 2, spe: 2};
+        const set = {
+          name: '', species: 'Delphox', item: 'Delphoxite', ability: 'Blaze', gender: '',
+          nature: 'Serious', moves: ['flamethrower'], evs: stats, ivs: stats, level: 50,
+        };
+        const team = [set, {...set, species: 'Incineroar', item: ''}];
+        const formatid = sim.toID('gen9championsvgc2026regmc');
+        const battle = new sim.Battle({formatid}, dex);
+        battle.setPlayer('p1', {team});
+        battle.setPlayer('p2', {team});
+        const mega = (b: sim.Battle) => {
+          const p = b.p1.pokemon[0];
+          p.formeChange('Delphox-Mega', null, true);
+          return [p.maxhp, p.storedStats.spa, p.storedStats.spe];
+        };
+
+        const restored = sim.Battle.fromJSON(battle.toJSON(), dex);
+        expect(restored.dex.currentMod).toBe('champions');
+        expect(restored.format.exists).toBe(true);
+        expect(mega(restored)).toEqual(mega(battle));
+        // without its dex, the battle falls back to the base rules
+        expect(sim.Battle.fromJSON(battle.toJSON()).format.exists).toBe(false);
+      });
     });
 
     describe('types', () => {

@@ -463,6 +463,16 @@ const REWRITES = {
     '\t\tthis.dex = Dex.forFormat(format);': '\t\tthis.dex = dex.forFormat(format);',
     "\t\t\t\t\tnewSet.species = Dex.species.get(set.species + 'crowned').name;":
       "\t\t\t\t\tnewSet.species = this.dex.species.get(set.species + 'crowned').name;",
+    // a mod's formats only exist on its own dex, so a restored battle needs the dex it was made with
+    '\tstatic fromJSON(serialized: string | AnyObject): Battle {':
+      '\tstatic fromJSON(serialized: string | AnyObject, dex = Dex): Battle {',
+    '\t\treturn State.deserializeBattle(serialized);':
+      '\t\treturn State.deserializeBattle(serialized, dex);',
+  },
+  'sim/state.ts': {
+    '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {':
+      '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {',
+    '\t\tconst battle = new Battle(options);': '\t\tconst battle = new Battle(options, dex);',
   },
   // smfh Zarle, please learn how Promises work
   'sim/battle-stream.ts': {

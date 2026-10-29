@@ -406,8 +406,8 @@ export class Battle {
 		return State.serializeBattle(this);
 	}
 
-	static fromJSON(serialized: string | AnyObject): Battle {
-		return State.deserializeBattle(serialized);
+	static fromJSON(serialized: string | AnyObject, dex = Dex): Battle {
+		return State.deserializeBattle(serialized, dex);
 	}
 
 	get p1() {

@@ -92,7 +92,7 @@ export const State = new class {
 	// the graph have been serialized as references. Once deserialzized, the
 	// Battle can then be restarted (and provided with a `send` function for
 	// receiving updates).
-	deserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {
+	deserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {
 		const state: /* Battle */ AnyObject =
 			typeof serialized === 'string' ? JSON.parse(serialized) : serialized;
 		// A state we didn't parse ourselves might be restored from again, so the Battle
@@ -130,7 +130,7 @@ export const State = new class {
 		// objects for us. The objects it creates will be incorrect, but we descend
 		// down through the fields and repopulate all of the objects with the
 		// correct state afterwards.
-		const battle = new Battle(options);
+		const battle = new Battle(options, dex);
 		// Calling `new Battle(...)` means side.pokemon is ordered to match what it
 		// was at the start of the battle (state.team), but we need to order the Pokemon
 		// back in their correct order based on how the battle has progressed. We need
