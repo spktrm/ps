@@ -23,8 +23,8 @@ export type MoveTarget =
   'allAdjacent' | 'allAdjacentFoes' | 'allies' | 'allySide' | 'allyTeam' |
   'any' | 'foeSide' | 'normal' | 'randomNormal' | 'scripted' | 'self';
 
-export type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Legends' |
-  'Custom' | 'Gmax' | 'Gigantamax';
+export type Nonstandard =
+  'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Legends' | 'Custom' | 'Gmax';
 
 export type EvoType =
   'trade' | 'useItem' | 'levelMove' | 'levelExtra' |

@@ -31,7 +31,8 @@ export default [...pkmn, {
     "@typescript-eslint/restrict-template-expressions": "off",
     "@typescript-eslint/return-await": "off",
     "@typescript-eslint/unbound-method": "off",
-    "import/order": "off",
+    "curly": "off",
+    "import-x/order": "off",
     "max-len": "off",
     "no-case-declarations": "off",
     "no-constant-binary-expression": "off",
@@ -39,6 +40,7 @@ export default [...pkmn, {
     "no-undef": "off",
     "no-unused-vars": "off",
     "no-var": "off",
+    "preserve-caught-error": "off",
     "sort-imports": "off",
   }
 }];

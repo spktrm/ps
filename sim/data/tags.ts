@@ -1,4 +1,11 @@
-import {Ability, IDEntry, Item, Move, Species} from '../sim/exported-global-types';
+import {
+	Ability,
+	IDEntry,
+	Item,
+	Move,
+	Species,
+	TableTag,
+} from '../sim/exported-global-types';
 
 export interface TagData {
 	name: string;

@@ -661,9 +661,9 @@ class Handler implements Required<Protocol.Handler<boolean>> {
         return args.length === 4 &&
           (args[3] === '' || (args[3] !== 'null' && verifyPokemonIdent(args[3]))) &&
           verifyKWArgs(kwArgs, ['miss', 'still', 'from'], this.gen) &&
-          (!kwArgs.from || kwArgs.from === 'move: Pursuit' ||
-            (this.gen?.num === 1 && BINDING.includes(kwArgs.from)) ||
-            verifyMoveName(kwArgs.from as Protocol.MoveName, this.gen));
+          (!kwArgs.from || ((this.gen?.num === 1 && BINDING.includes(kwArgs.from)) ||
+            (this.gen?.num === 2 && kwArgs.from === 'move: Pursuit') ||
+            verifyMoveName(kwArgs.from as Protocol.MoveName, this.gen)));
       }
       case 3: {
         return args.length === 4 &&
@@ -671,14 +671,15 @@ class Handler implements Required<Protocol.Handler<boolean>> {
             ? ['Helping Hand'].includes(args[2])
             : verifyPokemonIdent(args[3]))) &&
           verifyKWArgs(kwArgs, ['miss', 'still', 'from', 'notarget', 'spread'], this.gen) &&
-          (!kwArgs.from || ['lockedmove', 'move: Pursuit'].includes(kwArgs.from) ||
+          (!kwArgs.from || kwArgs.from === 'lockedmove' || kwArgs.from === 'move: Pursuit' ||
             verifyMoveName(kwArgs.from as Protocol.MoveName, this.gen));
       }
       case 4: {
+        // BUG: Quick Claw in Gen 4 should not set sourceEffect (missing from battle-actions.ts:452)
         const from = [
           'move: Metronome', 'move: Mirror Move', 'move: Sleep Talk', 'Snatch', 'move: Assist',
           'move: Copycat', 'Magic Coat', 'lockedmove', 'move: Me First', 'move: Nature Power',
-          'move: Pursuit', 'item: Custap Berry', 'item: Quick Claw',
+          'Pursuit', 'move: Pursuit', 'item: Quick Claw',
         ];
         return args.length === 4 &&
           (args[3] === '' || (args[3] === 'null'
@@ -871,7 +872,7 @@ class Handler implements Required<Protocol.Handler<boolean>> {
     if (this.gen?.num === 1) {
       if (!verifyKWArgs(kwArgs, ['from', 'of'], this.gen)) return false;
       return !kwArgs.from || (kwArgs.of
-        ? ['brn', 'psn', 'Leech Seed']
+        ? ['brn', 'psn', 'Leech Seed', 'Recoil']
         : ['brn', 'psn', 'confusion', 'Recoil']).includes(kwArgs.from);
     }
     return verifyKWArgs(kwArgs, [...KWARGS, 'partiallytrapped'], this.gen);

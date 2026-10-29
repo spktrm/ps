@@ -119,6 +119,8 @@ export type TableTag = TableGenericTag | TableSpeciesTag;
 
 export interface EffectData {
 	name?: string;
+	desc?: string;
+	shortDesc?: string;
 	duration?: number;
 	durationCallback?: (this: Battle, target: Pokemon, source: Pokemon, effect: Effect | null) => number;
 	effectType?: string;

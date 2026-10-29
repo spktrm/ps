@@ -1,3 +1,5 @@
+import {DebugOutput} from '../sim/exported-global-types';
+
 /**
  * Utils library
  *

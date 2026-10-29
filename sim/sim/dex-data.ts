@@ -92,6 +92,10 @@ export const definedCallbackNames = new Set<string>(['onSwitchIn']);
 export const speciesCallbackNames = new Set<string>();
 /** Callback names that any format or rule defines. */
 export const formatCallbackNames = new Set<string>();
+/** Callback names that any ability defines (abilities without onSwitchIn run onStart instead). */
+export const abilityCallbackNames = new Set<string>(['onSwitchIn']);
+/** Callback names that any item defines (items without onSwitchIn run onStart instead). */
+export const itemCallbackNames = new Set<string>(['onSwitchIn']);
 
 export function addDefinedCallbackNames(data: AnyObject, names = definedCallbackNames) {
 	for (const key in data) {
@@ -141,17 +145,17 @@ export abstract class BasicEffect implements EffectData {
 	 */
 	gen: number;
 	/**
+	 * A shortened form of the description of this effect.
+	 * Not all effects have this.
+	 */
+	shortDesc: string;
+	/** The full description for this effect. */
+	desc: string;
+	/**
 	 * Is this item/move/ability/pokemon nonstandard? Specified for effects
 	 * that have no use in standard formats: made-up pokemon (CAP),
 	 * glitches (MissingNo etc), Pokestar pokemon, etc.
 	 */
-	/**
-	 * A shortened form of the description of this effect.
-	 * Not all effects have this.
-	 */
-	declare shortDesc: string;
-	/** The full description for this effect. */
-	declare desc: string;
 	isNonstandard: Nonstandard | null;
 	/** For Hidden Power and Gigantamax forms - see NONSTANDARD.md */
 	placeholderFor?: string;
@@ -172,6 +176,8 @@ export abstract class BasicEffect implements EffectData {
 		this.effectType = Utils.getString(data.effectType) as EffectType || 'Condition';
 		this.exists = data.exists ?? !!this.id;
 		this.num = data.num || 0;
+		this.shortDesc = data.shortDesc || '';
+		this.desc = data.desc || '';
 		this.gen = data.gen || 0;
 		this.isNonstandard = data.isNonstandard || null;
 		this.duration = data.duration;

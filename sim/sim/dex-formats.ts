@@ -295,7 +295,7 @@ export class RuleTable extends Map<string, string> {
 		this.pickedTeamSize = Number(this.valueRules.get('pickedteamsize')) || null;
 		this.maxTotalLevel = Number(this.valueRules.get('maxtotallevel')) || null;
 		this.maxMoveCount = Number(this.valueRules.get('maxmovecount')) || 4;
-		this.minSourceGen = Number(this.valueRules.get('minsourcegen')) || 1;
+		this.minSourceGen = Number(this.valueRules.get('minsourcegen'));
 		this.minLevel = Number(this.valueRules.get('minlevel')) || 1;
 		this.maxLevel = Number(this.valueRules.get('maxlevel')) || 100;
 		this.defaultLevel = Number(this.valueRules.get('defaultlevel')) || 0;
@@ -303,6 +303,13 @@ export class RuleTable extends Map<string, string> {
 		this.adjustLevelDown = Number(this.valueRules.get('adjustleveldown')) || null;
 		this.evLimit = Number(this.valueRules.get('evlimit'));
 		if (isNaN(this.evLimit)) this.evLimit = null;
+		if (!this.minSourceGen) {
+			if (dex.gen >= 9 && this.has('obtainable') && !this.has('natdexmod')) {
+				this.minSourceGen = dex.gen;
+			} else {
+				this.minSourceGen = 1;
+			}
+		}
 
 		const timer: Partial<GameTimerSettings> = {};
 		if (this.valueRules.has('timerstarting')) {
@@ -442,13 +449,12 @@ export class RuleTable extends Map<string, string> {
 
 export class Format extends BasicEffect implements Readonly<BasicEffect> {
 	readonly mod: string;
-	declare readonly desc: string;
 	/**
 	 * Name of the team generator algorithm, if this format uses
 	 * random/fixed teams. null if players can bring teams.
 	 */
 	declare readonly team?: string;
-	readonly effectType: FormatEffectType;
+	override readonly effectType: FormatEffectType;
 	readonly debug: boolean;
 	/**
 	 * Whether or not a format will update ladder points if searched
@@ -582,7 +588,14 @@ export class DexFormats {
 
 	extend(formats: FormatList) {
 		this.load();
-		this.formatsListCache?.concat(this.buildList(formats));
+		const extended = this.buildList(formats);
+		if (this.dex.parentMod && this.dex.data.Rulesets === this.dex.dexes[this.dex.parentMod].data.Rulesets) {
+			this.dex.data.Rulesets = {...this.dex.data.Rulesets};
+		}
+		for (const format of extended) {
+			this.dex.data.Rulesets[format.id] = {...format, ruleTable: null};
+		}
+		this.formatsListCache = [...this.formatsListCache!, ...extended];
 		return this;
 	}
 
@@ -683,6 +696,12 @@ export class DexFormats {
 		return validatedFormatid;
 	}
 
+	/**
+	 * The default mode is `isTrusted = false`, which is a bit of a
+	 * footgun. PS will never do anything unsafe, but `isTrusted = true`
+	 * will throw if the format string is invalid, while
+	 * `isTrusted = false` will silently fall back to the original format.
+	 */
 	get(name?: string | Format, isTrusted = false): Format {
 		if (name && typeof name !== 'string') return name;
 
@@ -722,11 +741,11 @@ export class DexFormats {
 		}
 		let effect;
 		if (this.dex.data.Rulesets.hasOwnProperty(id)) {
-			effect = new Format({name, ...this.dex.data.Rulesets[id] as any, ...supplementaryAttributes});
+			effect = new Format({ name, ...this.dex.data.Rulesets[id] as any, ...supplementaryAttributes });
 			// rules aren't cached when formats are loaded, so cache them the first time they're looked up
 			if (cacheID) this.rulesetCache.set(cacheID, effect);
 		} else {
-			effect = new Format({id, name, exists: false});
+			effect = new Format({ id, name, exists: false });
 		}
 		return effect;
 	}

@@ -1,4 +1,4 @@
-import {ActiveMove, Condition, ModdedBattleScriptsData, Pokemon, toID} from '@pkmn/sim';
+import type {ActiveMove, Condition, ModdedBattleScriptsData, Pokemon} from '@pkmn/sim';
 
 export const Scripts: ModdedBattleScriptsData = {
 	gen: 9,

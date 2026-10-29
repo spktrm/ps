@@ -38,7 +38,7 @@ This package contains data and logic for several mods:
    and the Teal Mask DLC (ie. Generation 9 **without** the data from the Indigo Disk DLC)
 - `champions`: A mod on top of Generation 9 which contains the data and logic for Pokémon Champions
 - `championsregmb`: A mod on top of Generation 9 which applies the Regulation M-B restrictions to
-  Pokémon Champions data (the `champions` mod reflects the current regulation, Regulation M-C)
+  Pokémon Champions data
 
 These mods can be applied to a `Dex` implementation by passing the data as an argument to the `mod`
 method. Because of type inconsistencies between `@pkmn/sim` and `@pkmn/dex`, to typecheck **the

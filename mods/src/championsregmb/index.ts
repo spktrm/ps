@@ -4,3 +4,4 @@ export {Items} from './items';
 export {Learnsets} from './learnsets';
 export {Moves} from './moves';
 export {Scripts} from './scripts';
+

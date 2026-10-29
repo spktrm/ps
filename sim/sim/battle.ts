@@ -34,7 +34,9 @@ import {
  */
 
 import { Dex, toID } from './dex';
-import { definedCallbackNames, formatCallbackNames, speciesCallbackNames } from './dex-data';
+import {
+	abilityCallbackNames, definedCallbackNames, formatCallbackNames, itemCallbackNames, speciesCallbackNames,
+} from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -126,6 +128,13 @@ interface EventCallbackNames {
 	any: string;
 	source: string;
 	prefixed: boolean;
+	hasOn: boolean;
+	hasAlly: boolean;
+	hasFoe: boolean;
+	hasAny: boolean;
+	hasSource: boolean;
+	// the size of definedCallbackNames when the has* flags were set
+	definedCount: number;
 }
 
 // callback names for each event, so they aren't rebuilt on every call
@@ -141,8 +150,19 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 			any: `onAny${eventName}`,
 			source: `onSource${eventName}`,
 			prefixed: !UNPREFIXED_EVENTS.has(eventName),
+			hasOn: false, hasAlly: false, hasFoe: false, hasAny: false, hasSource: false,
+			definedCount: -1,
 		};
 		eventCallbackNames.set(eventName, names);
+	}
+	if (names.definedCount !== definedCallbackNames.size) {
+		const defined = definedCallbackNames;
+		names.hasOn = defined.has(names.on);
+		names.hasAlly = names.prefixed && defined.has(names.ally);
+		names.hasFoe = names.prefixed && defined.has(names.foe);
+		names.hasAny = names.prefixed && defined.has(names.any);
+		names.hasSource = names.prefixed && defined.has(names.source);
+		names.definedCount = defined.size;
 	}
 	return names;
 }
@@ -1144,15 +1164,9 @@ export class Battle {
 			return handlers;
 		}
 		const callbackNames = callbackNamesOf(eventName);
-		const defined = definedCallbackNames;
-		const hasOn = defined.has(callbackNames.on);
+		const { hasOn, hasAlly, hasFoe, hasAny, hasSource } = callbackNames;
 		// events that target a Pokemon normally bubble up to the Side
 		const shouldBubbleDown = target instanceof Side;
-		const prefixedHandlers = callbackNames.prefixed;
-		const hasAlly = prefixedHandlers && defined.has(callbackNames.ally);
-		const hasFoe = prefixedHandlers && defined.has(callbackNames.foe);
-		const hasAny = prefixedHandlers && defined.has(callbackNames.any);
-		const hasSource = prefixedHandlers && defined.has(callbackNames.source);
 		if (target instanceof Pokemon && (target.isActive || source?.isActive)) {
 			if (hasOn) this.findPokemonEventHandlers(target, callbackNames.on, undefined, handlers);
 			if (hasAlly || hasAny) {
@@ -1221,19 +1235,23 @@ export class Battle {
 				}, callbackName));
 			}
 		}
-		const ability = pokemon.getAbility();
-		callback = this.getCallback(pokemon, ability, callbackName, callbacks);
-		if (callback !== undefined || (getKey && pokemon.abilityState[getKey])) {
-			handlers.push(this.resolvePriority({
-				effect: ability, callback, state: pokemon.abilityState, end: pokemon.clearAbility, effectHolder: pokemon,
-			}, callbackName));
+		if (abilityCallbackNames.has(callbackName) || (getKey && pokemon.abilityState[getKey])) {
+			const ability = pokemon.getAbility();
+			callback = this.getCallback(pokemon, ability, callbackName, callbacks);
+			if (callback !== undefined || (getKey && pokemon.abilityState[getKey])) {
+				handlers.push(this.resolvePriority({
+					effect: ability, callback, state: pokemon.abilityState, end: pokemon.clearAbility, effectHolder: pokemon,
+				}, callbackName));
+			}
 		}
-		const item = pokemon.getItem();
-		callback = pokemon.item ? this.getCallback(pokemon, item, callbackName, callbacks) : undefined;
-		if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
-			handlers.push(this.resolvePriority({
-				effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
-			}, callbackName));
+		if (itemCallbackNames.has(callbackName) || (getKey && pokemon.itemState[getKey])) {
+			const item = pokemon.getItem();
+			callback = pokemon.item ? this.getCallback(pokemon, item, callbackName, callbacks) : undefined;
+			if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
+				handlers.push(this.resolvePriority({
+					effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
+				}, callbackName));
+			}
 		}
 		const species = pokemon.baseSpecies;
 		callback = speciesCallbackNames.has(callbackName) ?
@@ -3277,7 +3295,7 @@ export class Battle {
 
 	addMove(...args: (string | number | Function | AnyObject)[]) {
 		this.lastMoveLine = this.log.length;
-		// eslint-disable-next-line @typescript-eslint/no-base-to-string
+		// oxlint-disable-next-line typescript/no-base-to-string
 		this.log.push(`|${args.join('|')}`);
 	}
 
@@ -3295,7 +3313,7 @@ export class Battle {
 			parts[4] = '';
 			this.log[this.lastMoveLine] = parts.join('|');
 		}
-		// eslint-disable-next-line @typescript-eslint/no-base-to-string
+		// oxlint-disable-next-line typescript/no-base-to-string
 		this.log[this.lastMoveLine] += `|${args.join('|')}`;
 	}
 

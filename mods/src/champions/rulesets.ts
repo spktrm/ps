@@ -1,4 +1,4 @@
-import type {Item, ModdedFormatDataTable, Species} from '@pkmn/sim';
+import type {ModdedFormatDataTable} from '@pkmn/sim';
 
 export const Rulesets: ModdedFormatDataTable = {
 	standardag: {

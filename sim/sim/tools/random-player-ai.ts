@@ -1,4 +1,4 @@
-import {AnyObject} from '../exported-global-types';
+import {AnyObject, DebugOutput} from '../exported-global-types';
 
 /**
  * Example random player AI.
