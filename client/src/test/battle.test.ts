@@ -151,6 +151,30 @@ describe('Battle', () => {
     expect(battle.p2.active[0]).toBeNull();
     expect(battle.p2.team.filter(p => p.fainted).map(p => p.speciesForme)).toEqual(['Rillaboom']);
   });
+  it('#getSwitchedPokemon (dragged out)', () => {
+    const battle = new Battle(GENS);
+    for (const line of [
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|doubles', '|gen|9',
+      '|switch|p1a: Ting-Lu|Ting-Lu|100/100', '|switch|p1b: Houndstone|Houndstone, F|100/100',
+      '|switch|p2a: Slowbro|Slowbro, F|100/100', '|switch|p2b: Gothitelle|Gothitelle, M|100/100',
+      '|turn|1',
+      '|move|p2b: Gothitelle|Fake Out|p1b: Houndstone', '|-damage|p1b: Houndstone|90/100',
+      '|move|p1b: Houndstone|Shadow Ball|p2a: Slowbro', '|-damage|p2a: Slowbro|0 fnt',
+      '|faint|p2a: Slowbro',
+      '|move|p1a: Ting-Lu|Whirlwind|p2b: Gothitelle', '|drag|p2b: Amoonguss|Amoonguss, F|100/100',
+      '|upkeep',
+    ]) {
+      battle.add(line);
+    }
+    const gothitelle = battle.p2.team.find(p => p.name === 'Gothitelle')!;
+
+    // dragged out of p2b, it may still come in for the Slowbro that fainted at p2a
+    battle.add('|switch|p2a: Gothitelle|Gothitelle, M|100/100');
+    expect(battle.p2.team.filter(p => p.name === 'Gothitelle')).toEqual([gothitelle]);
+    expect(battle.p2.active[0]).toBe(gothitelle);
+    expect(gothitelle.moveSlots.map(m => [m.id, m.ppUsed])).toEqual([['fakeout', 1]]);
+  });
+
   it.todo('#rememberTeamPreviewPokemon');
   it.todo('#findCorrespondingPokemon');
 

@@ -292,8 +292,6 @@ export class Battle {
       if (pokemon.fainted) continue;
       // already active, can't be switching in
       if (side.active.includes(pokemon)) continue;
-      // just switched out, can't be switching in
-      if (pokemon === side.lastPokemon && !side.active[slot]) continue;
 
       if (pokemon.searchid === searchid) {
         // exact match
