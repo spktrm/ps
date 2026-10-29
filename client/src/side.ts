@@ -168,9 +168,10 @@ export class Side {
         existingTable[poke1.searchid] = poke1i;
       }
       if (toRemove >= 0) {
-        if (this.team[toRemove].fainted) {
+        const removed = this.team[toRemove];
+        let illusionFound = null;
+        if (removed.fainted) {
           // A fainted Pokemon was actually a Zoroark
-          let illusionFound = null;
           for (const curPoke of this.team) {
             if (curPoke === poke) continue;
             if (curPoke.fainted) continue;
@@ -183,6 +184,14 @@ export class Side {
               break;
             }
           }
+          // the stint it fainted in was the Illusion user's
+          removed.giveSwitchInTo(illusionFound);
+        }
+        // the rest is this one's, as is all of one switched out for itself, which either could be
+        if ((removed.fainted || this.active.includes(removed)) && removed !== poke) {
+          poke.takeHistoryFrom(removed);
+        }
+        if (removed.fainted) {
           if (!illusionFound) {
             // This is Hackmons; we'll just guess a random unfainted Pokemon.
             // This will keep the fainted Pokemon count correct, and will
@@ -213,6 +222,7 @@ export class Side {
     pokemon.slot = slot;
     pokemon.clearVolatile();
     pokemon.lastMove = '';
+    pokemon.markSwitchIn();
     this.battle.lastMove = 'switch-in';
     if (from && ['batonpass', 'zbatonpass', 'shedtail'].includes(from.id)) {
       const source = from.id === 'shedtail' ? 'shedtail' : 'batonpass';
@@ -233,6 +243,7 @@ export class Side {
 
     pokemon.clearVolatile();
     pokemon.lastMove = '';
+    pokemon.markSwitchIn();
     this.battle.lastMove = 'switch-in';
     this.active[slot] = pokemon;
     pokemon.slot = slot;
@@ -256,6 +267,7 @@ export class Side {
       pokemon.status = oldpokemon.status;
       pokemon.copyVolatileFrom(oldpokemon, 'illusion');
       pokemon.statusState = {...oldpokemon.statusState};
+      oldpokemon.giveSwitchInTo(pokemon);
       if (oldpokemon.terastallized) {
         pokemon.terastallized = oldpokemon.terastallized;
         oldpokemon.terastallized = undefined;

@@ -50,6 +50,23 @@ export type LastItemEffect =
 export type CopySource = 'batonpass' | 'illusion' | 'shedtail';
 export type PPState = number | [number, number];
 
+interface SwitchInState {
+  moveSlots: MoveSlot[];
+  item: ID;
+  itemEffect: ItemEffect | '';
+  lastItem: ID;
+  lastItemEffect: LastItemEffect | '';
+}
+
+const copyPP = (pp: PPState): PPState => typeof pp === 'number' ? pp : [pp[0], pp[1]];
+
+// The PP used since `b`, given the PP used now, `a`, each as [upper, lower].
+function subtractPP(a: PPState, b: PPState): PPState {
+  const [a0, a1] = typeof a === 'number' ? [a, a] : a;
+  const [b0, b1] = typeof b === 'number' ? [b, b] : b;
+  return a0 - b0 === a1 - b1 ? a0 - b0 : [a0 - b0, a1 - b1];
+}
+
 const VOLATILES = [
   'airballoon', 'attract', 'autotomize', 'disable', 'encore', 'foresight', 'gmaxchistrike',
   'imprison', 'laserfocus', 'mimic', 'miracleeye', 'nightmare', 'saltcure', 'smackdown',
@@ -127,6 +144,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   hurtThisTurn: boolean;
   movesUsedWhileActive: ID[];
   timesAttacked: number;
+  /** What was known of this Pokemon's moves and item when it last came in. */
+  switchInState?: Readonly<SwitchInState>;
 
   constructor(side: Side, details: DetailedPokemon, set?: PokemonSet) {
     this.side = side;
@@ -194,6 +213,7 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.hurtThisTurn = false;
     this.movesUsedWhileActive = [];
     this.timesAttacked = 0;
+    this.switchInState = undefined;
   }
 
   toString(): string {
@@ -418,6 +438,60 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.boosts = {};
     pokemon.volatiles = {};
     pokemon.statusStage = 0;
+  }
+
+  /** Notes the moves and item known as this Pokemon comes in. */
+  markSwitchIn() {
+    this.switchInState = {
+      moveSlots: this.moveSlots.map(m => ({...m, ppUsed: copyPP(m.ppUsed)})),
+      item: this.item,
+      itemEffect: this.itemEffect,
+      lastItem: this.lastItem,
+      lastItemEffect: this.lastItemEffect,
+    };
+  }
+
+  /** Gives what this Pokemon showed since it came in to the Illusion user it really was. */
+  giveSwitchInTo(pokemon?: Pokemon | null) {
+    const before = this.switchInState;
+    if (!before) return;
+    for (const slot of this.moveSlots) {
+      if (slot.virtual) continue;
+      const old = before.moveSlots.find(m => m.id === slot.id && !m.virtual);
+      const pp = old ? subtractPP(slot.ppUsed, old.ppUsed) : slot.ppUsed;
+      if (!old || pp !== 0) pokemon?.rememberMove(slot.name, pp);
+    }
+    this.moveSlots = before.moveSlots.map(m => ({...m, ppUsed: copyPP(m.ppUsed)}));
+    if (this.item !== before.item || this.itemEffect !== before.itemEffect ||
+      this.lastItem !== before.lastItem || this.lastItemEffect !== before.lastItemEffect) {
+      if (pokemon) {
+        pokemon.item = this.item;
+        pokemon.itemEffect = this.itemEffect;
+        pokemon.lastItem = this.lastItem;
+        pokemon.lastItemEffect = this.lastItemEffect;
+      }
+      this.item = before.item;
+      this.itemEffect = before.itemEffect;
+      this.lastItem = before.lastItem;
+      this.lastItemEffect = before.lastItemEffect;
+    }
+  }
+
+  /** Takes what another object for the same Pokemon knew, where this one knows nothing yet. */
+  takeHistoryFrom(pokemon: Pokemon) {
+    if (!this.moveSlots.length) {
+      this.moveSlots = pokemon.moveSlots.map(m => ({...m, ppUsed: copyPP(m.ppUsed)}));
+    }
+    if (!this.item && !this.lastItem) {
+      this.item = pokemon.item;
+      this.itemEffect = pokemon.itemEffect;
+      this.lastItem = pokemon.lastItem;
+      this.lastItemEffect = pokemon.lastItemEffect;
+    }
+    if (!this.baseAbility) {
+      this.ability = pokemon.ability;
+      this.baseAbility = pokemon.baseAbility;
+    }
   }
 
   private mergePP(entry: [MoveName, PPState], pp: PPState): PPState {
@@ -851,6 +925,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.hurtThisTurn = this.hurtThisTurn;
     pokemon.movesUsedWhileActive = copy(this.movesUsedWhileActive, memo);
     pokemon.timesAttacked = this.timesAttacked;
+    // never changed once taken, so copies can share it
+    pokemon.switchInState = this.switchInState;
     POKEMON_FIELDS ??= new Set(Object.keys(pokemon));
     copyRest(this, pokemon, POKEMON_FIELDS, memo);
     return pokemon;

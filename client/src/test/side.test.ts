@@ -2,7 +2,7 @@ import {Generations} from '@pkmn/data';
 import {Dex, Effect, ID} from '@pkmn/dex';
 import {DetailedPokemon, Protocol} from '@pkmn/protocol';
 
-import {Battle, Side} from '../index';
+import {Battle, Pokemon, Side} from '../index';
 
 // NOTE: tested exhaustively in integration/src/test/client.js
 describe('Side', () => {
@@ -55,6 +55,46 @@ describe('Side', () => {
     expect(side.team).toHaveLength(3);
     expect(zoroark.fainted).toBe(true);
     expect(side.team.find(p => p.name === 'Snorlax')!.fainted).toBe(false);
+
+    const play = (lines: string[]) => {
+      const b = new Battle(new Generations(Dex));
+      for (const line of ['|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gen|9', ...lines]) {
+        b.add(line);
+      }
+      return b;
+    };
+    const moves = (b: Battle, name: string) => Object.fromEntries(b.p1.team
+      .filter(p => p.name === name).flatMap(p => p.moveSlots.map(m => [m.id, m.ppUsed])));
+
+    // a Solrock that faints and then comes in again was Zoroark in the stint it fainted in
+    let b = play([
+      '|teamsize|p1|3', '|clearpoke', '|poke|p1|Solrock|', '|poke|p1|Ariados, M|',
+      '|poke|p1|Zoroark, M|',
+      '|poke|p2|Blissey, F|', '|teampreview',
+      '|switch|p1a: Solrock|Solrock|100/100', '|switch|p2a: Blissey|Blissey, F|100/100',
+      '|turn|1', '|move|p1a: Solrock|Stone Edge|p2a: Blissey',
+      '|switch|p1a: Ariados|Ariados, M|100/100', '|turn|2',
+      '|switch|p1a: Solrock|Solrock|24/100 tox', '|turn|3',
+      '|move|p1a: Solrock|Sludge Bomb|p2a: Blissey',
+      '|-damage|p1a: Solrock|0 fnt|[from] psn', '|faint|p1a: Solrock', '|upkeep',
+      '|switch|p1a: Solrock|Solrock|100/100',
+    ]);
+    expect(b.p1.team.filter(p => p.name === 'Solrock')).toHaveLength(1);
+    expect(moves(b, 'Solrock')).toEqual({stoneedge: 1});
+    expect(moves(b, 'Zoroark')).toEqual({sludgebomb: 1});
+    expect(b.p1.team.find(p => p.name === 'Zoroark')!.fainted).toBe(true);
+
+    // one switched out for itself could have been either, so it keeps all it showed
+    b = play([
+      '|teamsize|p1|2', '|switch|p1a: Xurkitree|Xurkitree|64/100 tox',
+      '|switch|p2a: Blissey|Blissey, F|100/100',
+      '|turn|1', '|move|p1a: Xurkitree|Thunderbolt|p2a: Blissey',
+      '|switch|p1a: Parasect|Parasect, F|100/100', '|turn|2',
+      '|switch|p1a: Xurkitree|Xurkitree|100/100', '|turn|3',
+      '|switch|p1a: Xurkitree|Xurkitree|64/100 tox',
+    ]);
+    expect(b.p1.team.filter(p => p.name === 'Xurkitree')).toHaveLength(1);
+    expect(moves(b, 'Xurkitree')).toEqual({thunderbolt: 1});
   });
 
   it('#switchIn', () => {
@@ -137,7 +177,34 @@ describe('Side', () => {
     expect(side.battle.lastMove).toBe('switch-in');
   });
 
-  it.todo('#replace');
+  it('#replace', () => {
+    const battle = new Battle(new Generations(Dex));
+    for (const line of [
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gen|9',
+      '|switch|p1a: Linoone|Linoone, M|100/100', '|switch|p2a: Unfezant|Unfezant, M|100/100',
+      '|turn|1', '|move|p1a: Linoone|Protect|p1a: Linoone',
+      '|switch|p1a: Musharna|Musharna, M|100/100', '|turn|2',
+      '|switch|p1a: Linoone|Linoone, M|100/100', '|turn|3',
+      '|move|p1a: Linoone|Nasty Plot|p1a: Linoone', '|-boost|p1a: Linoone|spa|2',
+      '|turn|4', '|move|p1a: Linoone|Protect|p1a: Linoone',
+      '|turn|5', '|move|p1a: Linoone|Dark Pulse|p2a: Unfezant',
+      '|-damage|p1a: Linoone|90/100|[from] item: Life Orb',
+      '|move|p2a: Unfezant|Return|p1a: Linoone', '|-damage|p1a: Linoone|30/100',
+      '|replace|p1a: Zoroark|Zoroark, M', '|-end|p1a: Zoroark|Illusion',
+    ]) {
+      battle.add(line);
+    }
+    const linoone = battle.p1.team.find(p => p.name === 'Linoone')!;
+    const zoroark = battle.p1.active[0]!;
+    expect(zoroark.name).toBe('Zoroark');
+
+    // what came out while it posed as Linoone was the Illusion user's
+    const moves = (p: Pokemon) => Object.fromEntries(p.moveSlots.map(m => [m.id, m.ppUsed]));
+    expect(moves(linoone)).toEqual({protect: 1});
+    expect(moves(zoroark)).toEqual({nastyplot: 1, protect: 1, darkpulse: 1});
+    expect(linoone.item).toBe('');
+    expect(zoroark.item).toBe('lifeorb');
+  });
   it.todo('#switchOut');
 
   it('#swapTo', () => {
