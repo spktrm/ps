@@ -54,6 +54,23 @@ if (argv._[0] === 'sim') {
     } while (forever);
     process.exit(failures);
   })();
+} else if (argv._[0] === 'differential') {
+  const {Differential} = require('./src/test/differential');
+
+  const formats = (argv.formats || argv.format)?.split(',') || Differential.FORMATS;
+  const num = Number(argv._[1] || argv.num) || undefined;
+  const differential = new Differential({...argv, num});
+  let errors = 0;
+  for (const format of formats) {
+    const {battles, checks, seen, end, ...result} = differential.run(format);
+    errors += result.errors;
+    const counts = o => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ') || 'none';
+    console.log(`${format}: ${battles} battles, ${checks} checks` +
+      (result.errors ? `, ${result.errors} errors` : ''));
+    console.log(`  mismatches seen: ${counts(seen)}`);
+    console.log(`  left at the end: ${counts(end)}`);
+  }
+  process.exit(errors);
 } else {
   console.error(`Unrecognized mode: ${argv._[0] || 'no mode specified'}\n`);
   process.exit(1);
