@@ -261,6 +261,7 @@ export class Side {
     pokemon.clearVolatile();
     if (oldpokemon) {
       pokemon.lastMove = oldpokemon.lastMove;
+      pokemon.choiceLock = oldpokemon.choiceLock;
       pokemon.hp = oldpokemon.hp;
       pokemon.maxhp = oldpokemon.maxhp;
       pokemon.hpcolor = oldpokemon.hpcolor;

@@ -230,7 +230,7 @@ export class Handler implements Protocol.Handler {
     const move = this.battle.get('moves', args[2]) as Partial<Move> & NA;
     const poke2 = this.battle.getPokemon(args[3]);
     this.battle.checkActive(poke);
-    poke.useMove(move, poke2, kwArgs.from as Protocol.EffectName | MoveName);
+    poke.useMove(move, poke2, kwArgs.from as Protocol.EffectName | MoveName, !!kwArgs.still);
   }
 
   '|cant|'(args: Args['|cant|']) {
@@ -519,6 +519,11 @@ export class Handler implements Protocol.Handler {
       }
     }
 
+    // a new item ends the lock, unless one Choice item took another's place
+    const isChoice = (id: string) => !!this.battle.gen.items.get(id)?.isChoice;
+    if (fromEffect.id && fromEffect.id !== 'frisk' && !(isChoice(poke.item) && isChoice(item.id))) {
+      poke.choiceLock = '';
+    }
     poke.item = item.id;
     poke.itemEffect = '';
 

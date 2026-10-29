@@ -58,6 +58,13 @@ interface SwitchInState {
   lastItemEffect: LastItemEffect | '';
 }
 
+/** PP that Pressure took from a foe's move, from what this Pokemon appeared to be. */
+interface PressureTaken {
+  pokemon: Pokemon;
+  move: MoveName;
+  pp: number;
+}
+
 const copyPP = (pp: PPState): PPState => typeof pp === 'number' ? pp : [pp[0], pp[1]];
 
 // The PP used since `b`, given the PP used now, `a`, each as [upper, lower].
@@ -76,6 +83,9 @@ const VARIABLE_TYPE = new Set([
   'aurawheel', 'hiddenpower', 'ivycudgel', 'judgment', 'multiattack', 'naturalgift', 'ragingbull',
   'revelationdance', 'technoblast', 'terablast', 'terastarstorm', 'terrainpulse', 'weatherball',
 ]);
+
+// moves used through these never lock their user in
+const UNLOCKED = new Set(['magiccoat', 'magicbounce', 'snatch']);
 
 // move ids that are Z-Moves or Max Moves, which they are in every generation
 const Z_OR_MAX = new Map<string, Move | null>();
@@ -157,8 +167,12 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   hurtThisTurn: boolean;
   movesUsedWhileActive: ID[];
   timesAttacked: number;
+  /** The move a Choice item or Gorilla Tactics would lock this Pokemon into. */
+  choiceLock: ID;
   /** What was known of this Pokemon's moves and item when it last came in. */
   switchInState?: Readonly<SwitchInState>;
+  /** The PP Pressure took from foes' moves since this Pokemon came in. */
+  pressureTaken: PressureTaken[];
 
   constructor(side: Side, details: DetailedPokemon, set?: PokemonSet) {
     this.side = side;
@@ -226,7 +240,9 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.hurtThisTurn = false;
     this.movesUsedWhileActive = [];
     this.timesAttacked = 0;
+    this.choiceLock = '';
     this.switchInState = undefined;
+    this.pressureTaken = [];
   }
 
   toString(): string {
@@ -427,6 +443,7 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.newlySwitched = true;
     this.beingCalledBack = false;
     this.movesUsedWhileActive = [];
+    this.choiceLock = '';
 
     this.statusStage = 0;
     this.statusState.toxicTurns = 0;
@@ -462,10 +479,14 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       lastItem: this.lastItem,
       lastItemEffect: this.lastItemEffect,
     };
+    this.pressureTaken = [];
   }
 
   /** Gives what this Pokemon showed since it came in to the Illusion user it really was. */
   giveSwitchInTo(pokemon?: Pokemon | null) {
+    // the Pressure was the disguise's, which the Illusion user doesn't have
+    for (const {pokemon: user, move, pp} of this.pressureTaken) user.refundPP(move, pp);
+    this.pressureTaken = [];
     const before = this.switchInState;
     if (!before) return;
     for (const slot of this.moveSlots) {
@@ -505,6 +526,12 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       this.ability = pokemon.ability;
       this.baseAbility = pokemon.baseAbility;
     }
+  }
+
+  private refundPP(name: MoveName, pp: number) {
+    const virtual = !!this.volatiles.transform;
+    const slot = this.moveSlots.find(m => m.name === name && m.virtual === virtual);
+    if (slot) slot.ppUsed = this.mergePP([slot.name, slot.ppUsed], -pp);
   }
 
   private mergePP(entry: [MoveName, PPState], pp: PPState): PPState {
@@ -576,12 +603,18 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   useMove(
     move: Partial<Move> & NA,
     target: Pokemon | null,
-    from?: EffectName | MoveName
+    from?: EffectName | MoveName,
+    still = false
   ) {
     const fromeffect = this.side.battle.get('conditions', from);
     this.activateAbility(fromeffect);
     this.clearMovestatuses();
     if (move.id === 'focuspunch') this.removeVolatile('focuspunch' as ID);
+    // the lock stops any other move before it takes PP, as if the move was never used
+    if (still && !fromeffect.id && this.choiceLock && this.choiceLock !== move.id &&
+      this.isLocked(move)) {
+      return void this.rememberMove(move.name, 0);
+    }
     if (fromeffect?.id === 'sleeptalk') {
       this.rememberMove(move.name, 0);
     }
@@ -619,10 +652,12 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       }
       // 1 pp was already deducted from using the move itself
       const pp: PPState = callerMoveForPressure ? 0 : 1;
-      this.rememberMove(
-        callerMoveForPressure ? callerMoveForPressure.name : moveName,
-        this.getPressurePP(pp, move, target)
-      );
+      const name = callerMoveForPressure ? callerMoveForPressure.name : moveName;
+      this.rememberMove(name, this.getPressurePP(pp, move, target, name));
+    }
+    if (!this.choiceLock && !move.isZ && !move.isMax && move.id !== 'struggle' &&
+      !UNLOCKED.has(fromeffect.id)) {
+      this.choiceLock = move.id;
     }
     this.lastMove = move.id;
     this.lastMoveTargetLoc = target
@@ -689,15 +724,26 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   private couldBeType(move: Move, type: TypeName, max: boolean) {
     if (move.type === type || VARIABLE_TYPE.has(move.id)) return true;
     if (!max) return false;
-    const known = this.ability || this.baseAbility;
-    const abilities = known ? [known] : Object.values(this.species.abilities).map(toID);
-    return abilities.some(a => (move.type === 'Normal' && ATE[a] === type) ||
+    return this.possibleAbilities().some(a => (move.type === 'Normal' && ATE[a] === type) ||
       (a === 'normalize' && type === 'Normal') ||
       (a === 'liquidvoice' && type === 'Water' && !!move.flags.sound));
   }
 
+  // Whether a Choice item or Gorilla Tactics is known to hold this Pokemon to its lock.
+  private isLocked(move: Partial<Move> & NA) {
+    if (move.id === 'struggle') return false;
+    const gen = this.side.battle.gen;
+    if (this.effectiveAbility() === 'gorillatactics') return !move.isZ && !move.isMax;
+    // before Gen 7 the lock only limits the moves that can be chosen
+    if (gen.num < 7 || !gen.items.get(this.item)?.isChoice || this.volatiles.dynamax) return false;
+    if (this.volatiles.embargo || this.side.battle.field.pseudoWeather.magicroom) return false;
+    return !this.possibleAbilities().includes('klutz' as ID);
+  }
+
   // Adds the PP that Pressure takes, from the Pokemon the sim's getMoveTargets checks for it.
-  private getPressurePP(pp: PPState, move: Partial<Move> & NA, target: Pokemon | null) {
+  private getPressurePP(
+    pp: PPState, move: Partial<Move> & NA, target: Pokemon | null, name: MoveName
+  ) {
     const active = this.side.battle.getAllActive();
     let checked: Pokemon[] = [];
     let min = 0;
@@ -738,6 +784,10 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       const [lo, hi] = this.pressureOf(p);
       min += lo;
       max += hi;
+      // kept in case p turns out to be an Illusion user
+      if (lo && this.side.battle.gen.num >= 5) {
+        p.pressureTaken.push({pokemon: this, move: name, pp: lo});
+      }
     }
     if (typeof pp === 'number') return min === max ? pp + min : [pp + max, pp + min] as PPState;
     return [pp[0] + max, pp[1] + min] as PPState;
@@ -749,13 +799,11 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     if (p.fainted || p === this || (this.side.battle.gen.num >= 5 && this.isAlly(p))) {
       return [0, 0];
     }
-    if (p.ability || p.baseAbility) {
-      return p.effectiveAbility() === 'pressure' ? [1, 1] : [0, 0];
-    }
+    if (p.knownAbility()) return p.effectiveAbility() === 'pressure' ? [1, 1] : [0, 0];
     // Gen 3 shows Pressure only to its own side
     if (this.side.battle.gen.num !== 3) return [0, 0];
-    const abilities = Object.values(this.side.battle.gen.species.get(p.speciesForme)!.abilities);
-    if (!abilities.some(a => toID(a) === 'pressure')) return [0, 0];
+    const abilities = p.possibleAbilities();
+    if (!abilities.includes('pressure' as ID)) return [0, 0];
     return abilities.length === 1 ? [1, 1] : [0, 1];
   }
 
@@ -814,9 +862,20 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.rememberAbility(effectOrName, isNotBase);
   }
 
+  // The ability this Pokemon is known to have: a transformed Pokemon has the one it copied.
+  private knownAbility() {
+    return this.volatiles.transform ? this.ability : this.ability || this.baseAbility;
+  }
+
+  // The abilities this Pokemon could have, which are its species' until one is known.
+  private possibleAbilities() {
+    const known = this.knownAbility();
+    return known ? [known] : Object.values(this.species.abilities).map(toID);
+  }
+
   effectiveAbility() {
     if (this.fainted || this.volatiles['gastroacid']) return '' as ID;
-    const ability = this.side.battle.gen.abilities.get(this.ability || this.baseAbility || '');
+    const ability = this.side.battle.gen.abilities.get(this.knownAbility() || '');
     if (this.side.battle.ngasActive() && !ability?.flags.cantsuppress) return '' as ID;
     return ability?.id || '';
   }
@@ -1001,8 +1060,10 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.hurtThisTurn = this.hurtThisTurn;
     pokemon.movesUsedWhileActive = copy(this.movesUsedWhileActive, memo);
     pokemon.timesAttacked = this.timesAttacked;
+    pokemon.choiceLock = this.choiceLock;
     // never changed once taken, so copies can share it
     pokemon.switchInState = this.switchInState;
+    pokemon.pressureTaken = this.pressureTaken.length ? copy(this.pressureTaken, memo) : [];
     POKEMON_FIELDS ??= new Set(Object.keys(pokemon));
     copyRest(this, pokemon, POKEMON_FIELDS, memo);
     return pokemon;

@@ -362,6 +362,57 @@ describe('Pokemon', () => {
       '|move|p1a: Snorlax|Tackle|p2a: Ditto',
     ]);
     expect(pp(battle, 'Snorlax', 'tackle')).toBe(1);
+
+    // a transformed Pokemon has the ability it copied, which Gen 3 doesn't show
+    battle = play(3, [
+      '|switch|p1a: Dusclops|Dusclops, L80, M|100/100', '|switch|p2a: Mew|Mew, L72|100/100',
+      '|turn|1', '|move|p1a: Dusclops|Will-O-Wisp|p2a: Mew', '|-status|p2a: Mew|brn',
+      '|-status|p1a: Dusclops|brn|[from] ability: Synchronize|[of] p2a: Mew',
+      '|turn|2', '|move|p2a: Mew|Transform|p1a: Dusclops', '|-transform|p2a: Mew|p1a: Dusclops',
+      '|turn|3', '|switch|p1a: Minun|Minun, L84, F|100/100',
+      '|move|p1a: Minun|Thunderbolt|p2a: Mew',
+    ]);
+    expect(pp(battle, 'Dusclops', 'willowisp')).toBe(1);
+    expect(pp(battle, 'Minun', 'thunderbolt')).toBe(2);
+
+    // Pressure is given back once the Pokemon it seemed to come from was an Illusion user
+    battle = play(5, [
+      '|switch|p1a: Raikou|Raikou, L76|100/100', '|-ability|p1a: Raikou|Pressure',
+      '|switch|p2a: Butterfree|Butterfree, L86, F|100/100', '|turn|1',
+      '|move|p2a: Butterfree|Bug Buzz|p1a: Raikou', '|-damage|p1a: Raikou|80/100',
+      '|turn|2', '|switch|p1a: Tornadus|Tornadus-Therian, L73, M|100/100',
+      '|turn|3', '|switch|p1a: Raikou|Raikou, L76|100/100',
+      '|move|p2a: Butterfree|Bug Buzz|p1a: Raikou', '|-damage|p1a: Raikou|0 fnt',
+      '|replace|p1a: Zoroark|Zoroark, L81, M', '|-end|p1a: Zoroark|Illusion',
+      '|faint|p1a: Zoroark',
+    ]);
+    expect(pp(battle, 'Butterfree', 'bugbuzz', 'p2')).toBe(3);
+
+    // a lock taken during the turn stops the move that was chosen before it, at no PP
+    const instructed = (item: string[]) => play(9, [
+      '|gametype|doubles',
+      '|switch|p1a: Oranguru|Oranguru, L88, M|100/100',
+      '|switch|p1b: Houndstone|Houndstone, L84, F|100/100',
+      '|switch|p2a: Lunala|Lunala, L72|100/100',
+      '|switch|p2b: Skeledirge|Skeledirge, L80, M|100/100', '|turn|1',
+      '|move|p2b: Skeledirge|Shadow Ball|p1b: Houndstone', ...item, '|turn|2',
+      '|move|p1a: Oranguru|Instruct|p2b: Skeledirge',
+      '|-singleturn|p2b: Skeledirge|move: Instruct|[of] p1a: Oranguru',
+      '|move|p2b: Skeledirge|Shadow Ball|p1b: Houndstone',
+      '|move|p2b: Skeledirge|Torch Song||[still]', '|-fail|p2b: Skeledirge',
+    ]);
+    battle = instructed([
+      '|move|p1b: Houndstone|Trick|p2b: Skeledirge',
+      '|-activate|p1b: Houndstone|move: Trick|[of] p2b: Skeledirge',
+      '|-item|p2b: Skeledirge|Choice Scarf|[from] move: Trick',
+      '|-item|p1b: Houndstone|Leftovers|[from] move: Trick',
+    ]);
+    expect(pp(battle, 'Skeledirge', 'shadowball', 'p2')).toBe(2);
+    expect(pp(battle, 'Skeledirge', 'torchsong', 'p2')).toBe(0);
+    expect(battle.p2.active[1]!.lastMove).toBe('shadowball');
+    // without a Choice item known, the move could have failed after it took PP
+    battle = instructed([]);
+    expect(pp(battle, 'Skeledirge', 'torchsong', 'p2')).toBe(1);
   });
   it.todo('#cantUseMove');
 
