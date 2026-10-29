@@ -20,7 +20,8 @@ client. Both can be run using the [`test`](test) script (which also provides sev
 options), though they can also be run with a fixed configuration via `npm test`. Several flags are
 available for both tests:
 
-- **`--seed`**: PRNG seed to use (eg. `'1234,5678,9012,3456'`).
+- **`--seed`**: PRNG seed to use (eg. `'1234,5678,9012,3456'`, or a sodium seed such as
+    `'sodium,00000001000000020000000300000004'`).
 - **`--error`**: dump the battle _input_ logs of each battle which errors.
 
 ### Simulator
@@ -67,16 +68,18 @@ following additional flags may be used:
 The differential can be started with **`test differential`** - this plays seeded random battles on
 the simulator, feeds each battle's spectator log to `@pkmn/client`, and after every update compares
 what the client tracks with the simulator's own state: the PP each move has used, the toxic counter
-and the sleep counter. It prints, per format, the mismatches seen at any point and those still left
-at the end of each battle, tagged by whether the side had an Illusion user or the Pokemon used a
-Z-Move or Dynamaxed. Some mismatches can't be fixed from the log (a Max Move whose base move was
-never revealed, a Zoroark that was never revealed), so the counts are a baseline to compare against,
-not a pass or fail. The following flags may be used:
+and the sleep counter. Each battle is played once with Gen 5 seeds and once with sodium seeds (the
+ChaCha20 PRNG Showdown seeds battles with). It prints, per format and PRNG, the mismatches seen at
+any point and those still left at the end of each battle, tagged by whether the side had an Illusion
+user or the Pokemon used a Z-Move or Dynamaxed. Some mismatches can't be fixed from the log (a Max
+Move whose base move was never revealed, a Zoroark that was never revealed), so the counts are a
+baseline to compare against, not a pass or fail. The following flags may be used:
 
 - **`--num`**: play this many battles per format instead of the default 250.
 - **`--format`** / **`--formats`**: play the specified format(s) instead of the default random
     formats from Gen 3 to Gen 9, separated by commas.
 - **`--offset`**: start from this battle number, to play other seeds.
+- **`--prng`**: seed only this PRNG (`gen5` or `sodium`) instead of both.
 - **`--sim`**: play on the build of a `smogon/pokemon-showdown` checkout (eg.
     `--sim=vendor/pokemon-showdown` after `node build` there) instead of `@pkmn/sim`, to check the
     client against the logs Showdown itself produces.

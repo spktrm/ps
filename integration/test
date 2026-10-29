@@ -17,7 +17,7 @@ if (argv._[0] === 'sim') {
 
   const options = Object.assign({totalGames: 100}, argv);
   options.totalGames = Number(argv._[1] || argv.num) || options.totalGames;
-  if (argv.seed) options.prng = argv.seed.split(',').map(s => Number(s));
+  if (argv.seed) options.prng = `${argv.seed}`;
   // Run options.totalGames, exiting with the number of games with errors.
   (async () => process.exit(await new MultiRandomRunner(options).run()))();
 } else if (argv._[0] === 'client') {
@@ -40,7 +40,7 @@ if (argv._[0] === 'sim') {
   }
   const maxFailures =
     argv.maxFailures || argv.failures || (formats.length > 1 ? ExhaustiveRunner.MAX_FAILURES : 1);
-  const prng = argv.seed && argv.seed.split(',').map(s => Number(s));
+  const prng = argv.seed && `${argv.seed}`;
   const log = true;
   const cmd = (cycles, format, seed) =>
     `node integration/test ${argv._[0]} --cycles=${cycles} --format=${format} --seed=${seed}`;
@@ -58,17 +58,20 @@ if (argv._[0] === 'sim') {
   const {Differential} = require('./src/test/differential');
 
   const formats = (argv.formats || argv.format)?.split(',') || Differential.FORMATS;
+  const prngs = argv.prng?.split(',') || Differential.PRNGS;
   const num = Number(argv._[1] || argv.num) || undefined;
   const differential = new Differential({...argv, num});
   let errors = 0;
-  for (const format of formats) {
-    const {battles, checks, seen, end, ...result} = differential.run(format);
-    errors += result.errors;
-    const counts = o => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ') || 'none';
-    console.log(`${format}: ${battles} battles, ${checks} checks` +
-      (result.errors ? `, ${result.errors} errors` : ''));
-    console.log(`  mismatches seen: ${counts(seen)}`);
-    console.log(`  left at the end: ${counts(end)}`);
+  for (const prng of prngs) {
+    for (const format of formats) {
+      const {battles, checks, seen, end, ...result} = differential.run(format, prng);
+      errors += result.errors;
+      const counts = o => Object.entries(o).map(([k, v]) => `${v} ${k}`).join(', ') || 'none';
+      console.log(`${format} (${prng} seeds): ${battles} battles, ${checks} checks` +
+        (result.errors ? `, ${result.errors} errors` : ''));
+      console.log(`  mismatches seen: ${counts(seen)}`);
+      console.log(`  left at the end: ${counts(end)}`);
+    }
   }
   process.exit(errors);
 } else {

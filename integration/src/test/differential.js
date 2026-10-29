@@ -2,7 +2,8 @@
 
 // Plays seeded random battles on the simulator, feeds each battle's spectator log to
 // @pkmn/client, and after every update compares what the client tracks with the simulator's own
-// state: the PP each move has used, the toxic counter and the sleep counter.
+// state: the PP each move has used, the toxic counter and the sleep counter. Each battle is played
+// once with Gen 5 seeds and once with sodium seeds (the ChaCha20 PRNG Showdown seeds battles with).
 
 const path = require('path');
 
@@ -13,6 +14,8 @@ const FORMATS = [
   'gen9randombattle', 'gen9randomdoublesbattle', 'gen8randombattle', 'gen7randombattle',
   'gen6randombattle', 'gen5randombattle', 'gen4randombattle', 'gen3randombattle',
 ];
+
+const PRNGS = ['gen5', 'sodium'];
 
 // @pkmn/sim with @pkmn/randoms, or the build of a Showdown checkout
 function simulator(checkout) {
@@ -29,13 +32,19 @@ function simulator(checkout) {
   };
 }
 
-// The seeds of battle n: the battle's own, each player's team, and each player's choices.
-function seeds(n) {
-  const battle = [n, n * 7 + 1, n * 13 + 2, n * 31 + 3].map(x => x & 0xffff);
+// The seeds of battle n for the PRNG: the battle's own, each player's team, and each player's
+// choices.
+function seeds(n, prng = 'gen5') {
+  const base = [n, n * 7 + 1, n * 13 + 2, n * 31 + 3].map(x => x & 0xffff);
+  const hex = xs => xs.map(x => x.toString(16).padStart(8, '0')).join('');
+  const seed = k => {
+    const xs = base.map(x => x ^ k);
+    return prng === 'sodium' ? `sodium,${hex(xs)}` : xs;
+  };
   return {
-    battle,
-    team: {p1: battle.map(x => x ^ 5), p2: battle.map(x => x ^ 6)},
-    ai: {p1: battle.map(x => x ^ 1), p2: battle.map(x => x ^ 2)},
+    battle: seed(0),
+    team: {p1: seed(5), p2: seed(6)},
+    ai: {p1: seed(1), p2: seed(2)},
   };
 }
 
@@ -43,30 +52,31 @@ class Differential {
   constructor(options = {}) {
     this.sim = simulator(options.sim);
     this.client = require(options.client ? path.resolve(options.client) : '@pkmn/client');
-    this.gens = new Generations(require('@pkmn/sim').Dex);
+    // @pkmn/dex, as the client is used: @pkmn/sim's Dex prefixes ability and item effect ids
+    this.gens = new Generations(require('@pkmn/dex').Dex);
     this.num = options.num || 250;
     this.offset = options.offset || 0;
     this.verbose = !!options.verbose;
   }
 
-  // Plays `num` battles of the format and returns how many checks ran and the mismatches, by
-  // kind and tag, first seen at any update and still there at the end of the battle.
-  run(format) {
-    const result = {format, battles: 0, errors: 0, checks: 0, seen: {}, end: {}};
+  // Plays `num` battles of the format seeded for the PRNG and returns how many checks ran and the
+  // mismatches, by kind and tag, first seen at any update and still there at the end of the battle.
+  run(format, prng = 'gen5') {
+    const result = {format, prng, battles: 0, errors: 0, checks: 0, seen: {}, end: {}};
     for (let n = this.offset + 1; n <= this.offset + this.num; n++) {
       try {
-        this.play(format, n, result);
+        this.play(format, n, prng, result);
         result.battles++;
       } catch (err) {
         result.errors++;
-        if (this.verbose) console.error(`${format} #${n}: ${err.stack}`);
+        if (this.verbose) console.error(`${format} #${n} (${prng}): ${err.stack}`);
       }
     }
     return result;
   }
 
-  play(format, n, result) {
-    const s = seeds(n);
+  play(format, n, prng, result) {
+    const s = seeds(n, prng);
     const sim = this.sim;
     let pending = [];
     const battle = new sim.Battle({
@@ -118,7 +128,9 @@ class Differential {
     }
     for (const m of last.values()) {
       result.end[m.label] = (result.end[m.label] || 0) + 1;
-      if (this.verbose) console.log(`  ${format} #${n} t${battle.turn} ${m.label}: ${m.detail}`);
+      if (this.verbose) {
+        console.log(`  ${format} #${n} (${prng}) t${battle.turn} ${m.label}: ${m.detail}`);
+      }
     }
   }
 
@@ -186,4 +198,5 @@ function key(ident) {
 }
 
 Differential.FORMATS = FORMATS;
+Differential.PRNGS = PRNGS;
 exports.Differential = Differential;

@@ -46,8 +46,7 @@ class Runner {
   constructor(options) {
     this.format = options.format;
 
-    this.prng = (options.prng && !Array.isArray(options.prng))
-      ? options.prng : new sim.PRNG(options.prng);
+    this.prng = sim.PRNG.get(options.prng);
     this.p1options = options.p1options;
     this.p2options = options.p2options;
 

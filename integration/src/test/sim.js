@@ -28,8 +28,7 @@ class MultiRandomRunner {
 
     this.totalGames = options.totalGames;
 
-    this.prng = (options.prng && !Array.isArray(options.prng))
-      ? options.prng : new pkmn.PRNG(options.prng);
+    this.prng = pkmn.PRNG.get(options.prng);
     this.options.prng = this.prng;
 
     this.format = options.format;

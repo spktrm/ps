@@ -5,6 +5,7 @@
   "dependencies": {
     "@pkmn/client": "file:../client",
     "@pkmn/data": "file:../data",
+    "@pkmn/dex": "file:../dex",
     "@pkmn/eslint-config": "^10.0.0",
     "@pkmn/img": "file:../img",
     "@pkmn/protocol": "file:../protocol",
