@@ -125,6 +125,117 @@ describe('Handler', () => {
     expect(snorlax.statusState.sleepTurns).toBe(0);
   });
 
+  it('|-item|', () => {
+    const doubles = [
+      '|gametype|doubles',
+      '|switch|p1a: Sneasler|Sneasler, L50, F|100/100',
+      '|switch|p1b: Indeedee|Indeedee, L50, M|100/100',
+      '|switch|p2a: Bastiodon|Bastiodon, L50, F|100/100',
+      '|switch|p2b: Sceptile|Sceptile, L50, M|100/100', '|turn|1',
+      '|move|p1b: Indeedee|Trick|p1a: Sneasler',
+      '|-activate|p1b: Indeedee|move: Trick|[of] p1a: Sneasler',
+      '|-item|p1a: Sneasler|Focus Sash|[from] move: Trick',
+      '|-item|p1b: Indeedee|White Herb|[from] move: Trick', '|turn|2',
+    ];
+    // an item handed over and used up at once ends before the line that hands it over
+    let battle = play(9, [
+      ...doubles,
+      '|move|p1a: Sneasler|Close Combat|p2a: Bastiodon', '|-damage|p2a: Bastiodon|40/100',
+      '|-unboost|p1a: Sneasler|def|1', '|-unboost|p1a: Sneasler|spd|1',
+      '|move|p1b: Indeedee|Trick|p1a: Sneasler',
+      '|-activate|p1b: Indeedee|move: Trick|[of] p1a: Sneasler',
+      '|-enditem|p1a: Sneasler|White Herb',
+      '|-clearnegativeboost|p1a: Sneasler|[silent]',
+      '|-item|p1a: Sneasler|White Herb|[from] move: Trick',
+      '|-item|p1b: Indeedee|Focus Sash|[from] move: Trick',
+    ]);
+    let sneasler = battle.p1.active[0]!;
+    expect(sneasler.item).toBe('');
+    expect(sneasler.itemEffect).toBe('');
+    expect(sneasler.lastItem).toBe('whiteherb');
+    expect(battle.p1.active[1]!.item).toBe('focussash');
+
+    // but one used up in an earlier move is held when handed over again
+    battle = play(9, [
+      ...doubles.slice(0, 6),
+      '|move|p2b: Sceptile|Earth Power|p1a: Sneasler', '|-damage|p1a: Sneasler|40/100',
+      '|-enditem|p1a: Sneasler|Sitrus Berry|[eat]',
+      '|-heal|p1a: Sneasler|65/100|[from] item: Sitrus Berry',
+      '|move|p1b: Indeedee|Trick|p1a: Sneasler',
+      '|-activate|p1b: Indeedee|move: Trick|[of] p1a: Sneasler',
+      '|-item|p1a: Sneasler|Sitrus Berry|[from] move: Trick',
+      '|-enditem|p1b: Indeedee|Sitrus Berry|[silent]|[from] move: Trick',
+    ]);
+    sneasler = battle.p1.active[0]!;
+    expect(sneasler.item).toBe('sitrusberry');
+    expect(sneasler.itemEffect).toBe('tricked');
+
+    const singles = (p1: string, p2: string, lines: string[]) => play(9, [
+      `|switch|p1a: ${p1}|${p1}, L50, M|100/100`, `|switch|p2a: ${p2}|${p2}, L50, F|100/100`,
+      '|-ability|p2a: Incineroar|Intimidate|boost', `|-unboost|p1a: ${p1}|atk|1`, '|turn|1',
+      ...lines,
+    ]);
+    battle = singles('Weavile', 'Incineroar', [
+      '|move|p1a: Weavile|Thief|p2a: Incineroar', '|-damage|p2a: Incineroar|91/100',
+      '|-enditem|p1a: Weavile|White Herb', '|-clearnegativeboost|p1a: Weavile|[silent]',
+      '|-enditem|p2a: Incineroar|White Herb|[silent]|[from] move: Thief|[of] p1a: Weavile',
+      '|-item|p1a: Weavile|White Herb|[from] move: Thief|[of] p2a: Incineroar',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('');
+    expect(battle.p1.active[0]!.itemEffect).toBe('');
+    expect(battle.p2.active[0]!.lastItem).toBe('whiteherb');
+
+    battle = singles('Weavile', 'Incineroar', [
+      '|move|p2a: Incineroar|Fake Out|p1a: Weavile', '|-damage|p1a: Weavile|83/100',
+      '|-enditem|p1a: Weavile|White Herb', '|-clearnegativeboost|p1a: Weavile|[silent]',
+      '|-enditem|p2a: Incineroar|White Herb|[silent]|[from] ability: Pickpocket|' +
+        '[of] p2a: Incineroar',
+      '|-item|p1a: Weavile|White Herb|[from] ability: Pickpocket|[of] p2a: Incineroar',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('');
+    expect(battle.p1.active[0]!.ability).toBe('pickpocket');
+
+    // one it used up before the hit's damage was its own
+    battle = singles('Weavile', 'Incineroar', [
+      '|move|p2a: Incineroar|Flare Blitz|p1a: Weavile', '|-supereffective|p1a: Weavile',
+      '|-enditem|p1a: Weavile|Focus Sash', '|-damage|p1a: Weavile|1/100',
+      '|-damage|p2a: Incineroar|80/100|[from] Recoil',
+      '|-enditem|p2a: Incineroar|Focus Sash|[silent]|[from] ability: Pickpocket|' +
+        '[of] p2a: Incineroar',
+      '|-item|p1a: Weavile|Focus Sash|[from] ability: Pickpocket|[of] p2a: Incineroar',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('focussash');
+    expect(battle.p1.active[0]!.itemEffect).toBe('stolen');
+
+    // Bestow takes the item from its user
+    battle = play(7, [
+      '|switch|p1a: Togekiss|Togekiss, L50, M|100/100',
+      '|switch|p2a: Incineroar|Incineroar, L50, F|100/100', '|turn|1',
+      '|move|p1a: Togekiss|Bestow|p2a: Incineroar',
+      '|-item|p2a: Incineroar|White Herb|[from] move: Bestow|[of] p1a: Togekiss',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('');
+    expect(battle.p1.active[0]!.lastItem).toBe('whiteherb');
+    expect(battle.p2.active[0]!.item).toBe('whiteherb');
+    expect(battle.p2.active[0]!.itemEffect).toBe('bestowed');
+
+    // a Pokemon known to hold an item it used up can steal another the same
+    battle = play(9, [
+      '|switch|p1a: Weavile|Weavile, L50, M|100/100',
+      '|switch|p2a: Exeggutor|Exeggutor, L50, F|100/100',
+      '|-item|p1a: Weavile|Sitrus Berry|[from] ability: Frisk|[of] p2a: Exeggutor', '|turn|1',
+      '|switch|p2a: Garchomp|Garchomp, L50, F|100/100',
+      '|move|p1a: Weavile|Thief|p2a: Garchomp', '|-damage|p2a: Garchomp|92/100',
+      '|-damage|p1a: Weavile|48/100|[from] ability: Rough Skin|[of] p2a: Garchomp',
+      '|-enditem|p1a: Weavile|Sitrus Berry|[eat]',
+      '|-heal|p1a: Weavile|73/100|[from] item: Sitrus Berry',
+      '|-enditem|p2a: Garchomp|Sitrus Berry|[silent]|[from] move: Thief|[of] p1a: Weavile',
+      '|-item|p1a: Weavile|Sitrus Berry|[from] move: Thief|[of] p2a: Garchomp',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('sitrusberry');
+    expect(battle.p1.active[0]!.itemEffect).toBe('stolen');
+  });
+
   it('|-ability|', () => {
     // Simple Beam names the ability it replaced, which comes back after a switch
     const beam = play(9, [
@@ -165,7 +276,7 @@ describe('Handler', () => {
 
   it('|-activate|', () => {
     // a Pokemon that transformed swaps away the ability it copied, not its own
-    const battle = play(9, [
+    let battle = play(9, [
       '|gametype|doubles',
       '|switch|p1a: Mew|Mew, L50|175/175', '|switch|p1b: Blissey|Blissey, L50, F|330/330',
       '|switch|p2a: Espeon|Espeon, L50, M|140/140',
@@ -180,6 +291,34 @@ describe('Handler', () => {
     expect(mew.baseAbility).toBe('');
     expect(gengar.ability).toBe('magicbounce');
     expect(gengar.baseAbility).toBe('cursedbody');
+
+    // Symbiosis hands its holder's item over, even one used up at once
+    const symbiosis = (item: string, used: string[] = []) => play(9, [
+      '|gametype|doubles',
+      '|switch|p1a: Sneasler|Sneasler, L50, M|155/155',
+      '|switch|p1b: Oranguru|Oranguru, L50, F|165/165',
+      '|switch|p2a: Incineroar|Incineroar, L50, F|170/170',
+      '|switch|p2b: Gyarados|Gyarados, L50, M|170/170', '|turn|1',
+      '|move|p2a: Incineroar|Baby-Doll Eyes|p1a: Sneasler', '|-unboost|p1a: Sneasler|atk|1',
+      '|move|p2b: Gyarados|Super Fang|p1a: Sneasler', '|-damage|p1a: Sneasler|50/155',
+      '|-enditem|p1a: Sneasler|Sitrus Berry|[eat]',
+      '|-heal|p1a: Sneasler|88/155|[from] item: Sitrus Berry',
+      ...used,
+      `|-activate|p1b: Oranguru|ability: Symbiosis|${item}|[of] p1a: Sneasler`,
+    ]);
+    battle = symbiosis('White Herb', [
+      '|-enditem|p1a: Sneasler|White Herb', '|-clearnegativeboost|p1a: Sneasler|[silent]',
+    ]);
+    expect(battle.p1.active[0]!.item).toBe('');
+    expect(battle.p1.active[0]!.lastItem).toBe('whiteherb');
+    expect(battle.p1.active[1]!.item).toBe('');
+    expect(battle.p1.active[1]!.lastItem).toBe('whiteherb');
+    expect(battle.p1.active[1]!.ability).toBe('symbiosis');
+    // the item it used up first was its own
+    battle = symbiosis('Sitrus Berry');
+    expect(battle.p1.active[0]!.item).toBe('sitrusberry');
+    expect(battle.p1.active[0]!.itemEffect).toBe('bestowed');
+    expect(battle.p1.active[1]!.item).toBe('');
   });
 
   it('|-endability|', () => {

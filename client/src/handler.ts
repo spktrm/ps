@@ -8,18 +8,36 @@ import {
 
 import {Battle, NA, NULL} from './battle';
 import {CloneMemo, cloneable, copyRest} from './clone';
-import {LastItemEffect} from './pokemon';
+import {LastItemEffect, Pokemon} from './pokemon';
 
 const BOOSTS: BoostID[] = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'];
 const CONSUMED: LastItemEffect[] = ['eaten', 'popped', 'consumed', 'held up'];
+// the effects whose -item the sim sends after the item's own Start has run
+const HANDED = ['trick', 'switcheroo', 'bestow', 'thief', 'covet', 'magician', 'pickpocket'];
 
 export class Handler implements Protocol.Handler {
   readonly battle: Battle;
   readonly player: ID | null;
 
+  // the items used up since the last move, switch or turn, whether each was known to be held, and
+  // whether its holder was hurt or healed since, which no item handed over and used up at once does
+  private readonly usedUp: Array<{pokemon: Pokemon; item: ID; known: boolean; stale: boolean}> = [];
+
   constructor(battle: Battle, player: ID | null = null) {
     this.battle = battle;
     this.player = player;
+  }
+
+  // Whether the item the sim says it handed over was used up at once, which it logs first
+  private handedAndUsedUp(poke: Pokemon, item: ID, symbiosis = false) {
+    const mine = this.usedUp.filter(u => u.pokemon === poke);
+    const last = mine[mine.length - 1];
+    // Symbiosis hands an item over after the receiver used one up, which was its own
+    const used = symbiosis
+      ? (mine.length > 1 && last.item === item && !last.stale ? last : undefined)
+      : mine.reverse().find(u => u.item === item && !u.known && !u.stale);
+    if (used) this.usedUp.splice(this.usedUp.indexOf(used), 1);
+    return !!used;
   }
 
   clone(memo: CloneMemo = new Map()): this {
@@ -47,6 +65,7 @@ export class Handler implements Protocol.Handler {
   }
 
   '|turn|'(args: Args['|turn|']) {
+    this.usedUp.length = 0;
     this.battle.setTurn(args[1]);
   }
 
@@ -190,6 +209,7 @@ export class Handler implements Protocol.Handler {
   }
 
   switch(args: Args['|switch|' | '|drag|' | '|replace|'], kwArgs?: KWArgs['|switch|']) {
+    this.usedUp.length = 0;
     const poke = this.battle.getSwitchedPokemon(args[1], args[2]);
     const slot = poke.slot;
     if (args[3]) poke.healthParse(args[3]);
@@ -229,6 +249,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     const move = this.battle.get('moves', args[2]) as Partial<Move> & NA;
     const poke2 = this.battle.getPokemon(args[3]);
+    this.usedUp.length = 0;
     this.battle.checkActive(poke);
     poke.useMove(move, poke2, kwArgs.from as Protocol.EffectName | MoveName, !!kwArgs.still);
   }
@@ -249,6 +270,7 @@ export class Handler implements Protocol.Handler {
     const damage = poke.healthParse(args[2]);
     if (damage === null) return;
     if (damage[0]) poke.hurtThisTurn = true;
+    for (const u of this.usedUp) if (u.pokemon === poke) u.stale = true;
 
     if (kwArgs.from) {
       const fromEffect = this.battle.get('conditions', kwArgs.from);
@@ -272,6 +294,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1], revival)!;
     const damage = poke.healthParse(args[2]);
     if (damage === null) return;
+    for (const u of this.usedUp) if (u.pokemon === poke) u.stale = true;
 
     // moves, Leech Seed, Rest and Z-Moves heal without a [from]
     if (!fromEffect) return;
@@ -524,11 +547,14 @@ export class Handler implements Protocol.Handler {
     if (fromEffect.id && fromEffect.id !== 'frisk' && !(isChoice(poke.item) && isChoice(item.id))) {
       poke.choiceLock = '';
     }
-    poke.item = item.id;
-    poke.itemEffect = '';
-
-    poke.removeVolatile('airballoon' as ID);
-    if (item.id === 'airballoon') poke.addVolatile('airballoon' as ID);
+    // an item handed over and used up at once isn't held, nor is it what the Pokemon holds now
+    const usedUp = HANDED.includes(fromEffect.id) && this.handedAndUsedUp(poke, item.id);
+    if (!usedUp) {
+      poke.item = item.id;
+      poke.itemEffect = '';
+      poke.removeVolatile('airballoon' as ID);
+      if (item.id === 'airballoon') poke.addVolatile('airballoon' as ID);
+    }
 
     if (fromEffect?.id) {
       switch (fromEffect.id) {
@@ -548,18 +574,23 @@ export class Handler implements Protocol.Handler {
         // falls through
         case 'thief':
         case 'covet':
-        // simulate the removal of the item from the ofpoke
+        case 'bestow': {
+          // simulate the removal of the item from the ofpoke
+          const bestow = fromEffect.id === 'bestow';
           ofPoke!.item = '';
           ofPoke!.itemEffect = '';
           ofPoke!.lastItem = item.id;
-          ofPoke!.lastItemEffect = 'stolen';
+          ofPoke!.lastItemEffect = bestow ? '' : 'stolen';
           ofPoke!.addVolatile('itemremoved' as ID);
-          return void (poke.itemEffect = 'stolen');
+          if (!usedUp) poke.itemEffect = bestow ? 'bestowed' : 'stolen';
+          return;
+        }
         case 'harvest':
           poke.itemEffect = 'harvested';
           return poke.activateAbility('Harvest');
-        case 'bestow': return void (poke.itemEffect = 'bestowed');
-        case 'switcheroo': case 'trick': return void (poke.itemEffect = 'tricked');
+        case 'switcheroo': case 'trick':
+          if (!usedUp) poke.itemEffect = 'tricked';
+          return;
       }
     }
   }
@@ -568,6 +599,11 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     const item = this.battle.get('items', args[2]);
     const fromEffect = this.battle.get('conditions', kwArgs.from);
+
+    // used up, not taken or handed over
+    if (!kwArgs.from && !kwArgs.silent) {
+      this.usedUp.push({pokemon: poke, item: item.id, known: poke.item === item.id, stale: false});
+    }
 
     if (this.battle.gen.num > 4 || fromEffect.id !== 'knockoff') {
       poke.item = '';
@@ -935,6 +971,19 @@ export class Handler implements Protocol.Handler {
       case 'focusband': case 'quickclaw': case 'abilityshield':
         poke!.item = effect.id;
         break;
+      case 'symbiosis': {
+        const item = this.battle.get('items', kwArgs.item).id;
+        poke!.item = '';
+        poke!.itemEffect = '';
+        poke!.lastItem = item;
+        poke!.lastItemEffect = '';
+        poke!.addVolatile('itemremoved' as ID);
+        if (!this.handedAndUsedUp(poke2!, item, true)) {
+          poke2!.item = item;
+          poke2!.itemEffect = 'bestowed';
+        }
+        break;
+      }
     }
   }
 
