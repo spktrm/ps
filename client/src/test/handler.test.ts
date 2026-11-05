@@ -125,6 +125,63 @@ describe('Handler', () => {
     expect(snorlax.statusState.sleepTurns).toBe(0);
   });
 
+  it('|-ability|', () => {
+    // Simple Beam names the ability it replaced, which comes back after a switch
+    const beam = play(9, [
+      '|switch|p1a: Sneasler|Sneasler, L50, M|155/155',
+      '|switch|p2a: Indeedee|Indeedee, L50, M|135/135', '|turn|1',
+      '|move|p2a: Indeedee|Simple Beam|p1a: Sneasler',
+      '|-ability|p1a: Sneasler|Simple|Unburden|[from] move: Simple Beam',
+    ]);
+    const sneasler = beam.p1.active[0]!;
+    expect(sneasler.ability).toBe('simple');
+    expect(sneasler.baseAbility).toBe('unburden');
+    beam.add('|switch|p1a: Pelipper|Pelipper, L50, F|135/135');
+    expect(sneasler.ability).toBe('unburden');
+
+    // Doodle doesn't name whose ability it copied
+    const doodle = play(9, [
+      '|gametype|doubles',
+      '|switch|p1a: Sneasler|Sneasler, L50, M|155/155',
+      '|switch|p1b: Smeargle|Smeargle, L50, F|130/130',
+      '|switch|p2a: Incineroar|Incineroar, L50, F|170/170',
+      '|switch|p2b: Gyarados|Gyarados, L50, M|170/170', '|turn|1',
+      '|move|p1b: Smeargle|Doodle|p2b: Gyarados',
+      '|-ability|p1a: Sneasler|Moxie|Unburden|[from] move: Doodle',
+      '|-ability|p1b: Smeargle|Moxie|Own Tempo|[from] move: Doodle',
+    ]);
+    expect(doodle.p1.active[0]!.ability).toBe('moxie');
+    expect(doodle.p1.active[0]!.baseAbility).toBe('unburden');
+    expect(doodle.p1.active[1]!.baseAbility).toBe('owntempo');
+    expect(doodle.p2.active[1]!.ability).toBe('');
+
+    // Intimidate's boost names no ability
+    const intimidate = play(9, [
+      '|switch|p1a: Incineroar|Incineroar, L50, F|170/170',
+      '|-ability|p1a: Incineroar|Intimidate|boost',
+    ]);
+    expect(intimidate.p1.active[0]!.baseAbility).toBe('intimidate');
+  });
+
+  it('|-activate|', () => {
+    // a Pokemon that transformed swaps away the ability it copied, not its own
+    const battle = play(9, [
+      '|gametype|doubles',
+      '|switch|p1a: Mew|Mew, L50|175/175', '|switch|p1b: Blissey|Blissey, L50, F|330/330',
+      '|switch|p2a: Espeon|Espeon, L50, M|140/140',
+      '|switch|p2b: Gengar|Gengar, L50, F|135/135', '|turn|1',
+      '|move|p1a: Mew|Transform|p2a: Espeon', '|-transform|p1a: Mew|p2a: Espeon', '|turn|2',
+      '|move|p1a: Mew|Skill Swap|p2b: Gengar',
+      '|-activate|p1a: Mew|Skill Swap|Cursed Body|Magic Bounce|[of] p2b: Gengar',
+    ]);
+    const mew = battle.p1.active[0]!;
+    const gengar = battle.p2.active[1]!;
+    expect(mew.ability).toBe('cursedbody');
+    expect(mew.baseAbility).toBe('');
+    expect(gengar.ability).toBe('magicbounce');
+    expect(gengar.baseAbility).toBe('cursedbody');
+  });
+
   it('|-endability|', () => {
     const battle = play(9, [
       '|switch|p1a: Mew|Mew|100/100', '|switch|p2a: Kyurem|Kyurem|100/100',

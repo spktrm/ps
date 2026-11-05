@@ -624,10 +624,11 @@ export class Handler implements Protocol.Handler {
 
     if (kwArgs.silent) return; // do nothing
 
-    if (oldAbility.id && ofPoke) {
+    // a changed ability names the one it replaced, the base ability unless one is known
+    if (oldAbility.kind === 'Ability') {
       poke.activateAbility(oldAbility.name);
       poke.activateAbility(ability.name, true);
-      ofPoke.rememberAbility(ability.name);
+      ofPoke?.rememberAbility(ability.name);
       return;
     }
 
@@ -892,18 +893,11 @@ export class Handler implements Protocol.Handler {
         if (this.battle.gen.num <= 4) break;
         const pokeability = toID(kwArgs.ability) || poke2!.ability;
         const targetability = toID(kwArgs.ability2) || poke!.ability;
-        if (pokeability) {
-          poke!.ability = pokeability;
-          if (!poke2!.baseAbility) poke2!.baseAbility = pokeability;
-        }
-        if (targetability) {
-          poke2!.ability = targetability;
-          if (!poke!.baseAbility) poke!.baseAbility = targetability;
-        }
-        if (poke!.side !== poke2!.side) {
-          poke!.activateAbility(pokeability, true);
-          poke2!.activateAbility(targetability, true);
-        }
+        // each gives the other its ability, its base ability unless one is known
+        if (pokeability) poke2!.rememberAbility(pokeability);
+        if (targetability) poke!.rememberAbility(targetability);
+        if (pokeability) poke!.rememberAbility(pokeability, true);
+        if (targetability) poke2!.rememberAbility(targetability, true);
         break;
       }
 
