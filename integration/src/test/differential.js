@@ -2,8 +2,9 @@
 
 // Plays seeded random battles on the simulator, feeds each battle's spectator log to
 // @pkmn/client, and after every update compares what the client tracks with the simulator's own
-// state: the PP each move has used, the toxic counter and the sleep counter. Each battle is played
-// once with Gen 5 seeds and once with sodium seeds (the ChaCha20 PRNG Showdown seeds battles with).
+// state: the PP each move has used, the item, the abilities, and the toxic and sleep counters. Each
+// battle is played once with Gen 5 seeds and once with sodium seeds (the ChaCha20 PRNG Showdown
+// seeds battles with).
 
 const path = require('path');
 
@@ -116,6 +117,9 @@ class Differential {
         if (seen.has(k)) continue;
         seen.add(k);
         result.seen[m.label] = (result.seen[m.label] || 0) + 1;
+        if (this.verbose) {
+          console.log(`  seen ${format} #${n} (${prng}) t${battle.turn} ${m.label}: ${m.detail}`);
+        }
       }
       last = now;
       for (const side of battle.sides) {
@@ -169,7 +173,29 @@ class Differential {
             ` known=${known}/${sp.moveSlots.length}${placeholder ? ' z/max placeholder' : ''}`);
         }
 
-        if (!sp.isActive || sp.fainted) continue;
+        if (sp.fainted) continue;
+        // the item the client says the Pokemon holds, or that it holds none (before Gen 5 the
+        // client keeps an item that was knocked off)
+        if ((cp.item || cp.lastItem) && cp.itemEffect !== 'knocked off') {
+          result.checks++;
+          if (cp.item ? cp.item !== sp.item : sp.item) {
+            add('item', 'item', `item sim=${sp.item} client=${cp.item || `none (${cp.lastItem})`}`);
+          }
+        }
+        if (cp.baseAbility) {
+          result.checks++;
+          if (cp.baseAbility !== sp.baseAbility) {
+            add('base', 'base', `base ability sim=${sp.baseAbility} client=${cp.baseAbility}`);
+          }
+        }
+        if (cp.ability && sp.isActive) {
+          result.checks++;
+          if (cp.ability !== sp.ability) {
+            add('ability', 'ability', `ability sim=${sp.ability} client=${cp.ability}`);
+          }
+        }
+
+        if (!sp.isActive) continue;
         if (sp.status === 'tox' && battle.gen >= 3 && cp.status === 'tox') {
           result.checks++;
           const stage = sp.statusState.stage;
