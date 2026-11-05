@@ -87,6 +87,35 @@ describe('Handler', () => {
     ld.add('|-heal|p1a: Snorlax|100/100|[from] move: Lunar Dance');
     expect(lunar.moveSlots[0].ppUsed).toBe(0);
     expect(ld.lastMove).toBe('healing-wish');
+
+    // a berry eaten off another or flung at a Pokemon heals it but isn't its item
+    const bugbite = play(9, [
+      '|switch|p1a: Scyther|Scyther, L50, M|40/145', '|switch|p2a: Blissey|Blissey, L50, F|330/330',
+      '|turn|1',
+      '|move|p1a: Scyther|Bug Bite|p2a: Blissey', '|-damage|p2a: Blissey|77/330',
+      '|-enditem|p2a: Blissey|Sitrus Berry|[from] stealeat|[move] Bug Bite|[of] p1a: Scyther',
+      '|-heal|p1a: Scyther|76/145|[from] item: Sitrus Berry',
+    ]);
+    expect(bugbite.p1.active[0]!.item).toBe('');
+    expect(bugbite.p2.active[0]!.lastItem).toBe('sitrusberry');
+    expect(bugbite.p2.active[0]!.lastItemEffect).toBe('stolen');
+    const fling = play(9, [
+      '|switch|p1a: Weavile|Weavile, L50, M|145/145',
+      '|switch|p2a: Incineroar|Incineroar, L50, F|50/170', '|turn|1',
+      '|move|p1a: Weavile|Fling|p2a: Incineroar', '|-damage|p2a: Incineroar|46/170',
+      '|-heal|p2a: Incineroar|88/170|[from] item: Sitrus Berry|[of] p1a: Weavile',
+      '|-enditem|p1a: Weavile|Sitrus Berry|[from] move: Fling',
+    ]);
+    expect(fling.p2.active[0]!.item).toBe('');
+    expect(fling.p1.active[0]!.lastItem).toBe('sitrusberry');
+    // Shell Bell heals its holder [of] the Pokemon it hit
+    const shellbell = play(9, [
+      '|switch|p1a: Weavile|Weavile, L50, M|40/145', '|switch|p2a: Blissey|Blissey, L50, F|330/330',
+      '|turn|1',
+      '|move|p1a: Weavile|Night Slash|p2a: Blissey', '|-damage|p2a: Blissey|117/330',
+      '|-heal|p1a: Weavile|66/145|[from] item: Shell Bell|[of] p2a: Blissey',
+    ]);
+    expect(shellbell.p1.active[0]!.item).toBe('shellbell');
   });
 
   it('|-status|', () => {
@@ -264,7 +293,26 @@ describe('Handler', () => {
     expect(doodle.p1.active[0]!.ability).toBe('moxie');
     expect(doodle.p1.active[0]!.baseAbility).toBe('unburden');
     expect(doodle.p1.active[1]!.baseAbility).toBe('owntempo');
-    expect(doodle.p2.active[1]!.ability).toBe('');
+    // but it copied its target's
+    expect(doodle.p2.active[1]!.ability).toBe('moxie');
+    expect(doodle.p2.active[1]!.baseAbility).toBe('moxie');
+    expect(doodle.p2.active[0]!.ability).toBe('');
+
+    // As One shows as As One and Unnerve, and its boost as Chilling Neigh
+    const asOne = play(9, [
+      '|switch|p1a: Calyrex|Calyrex-Ice, L50|175/175', '|switch|p2a: Shuckle|Shuckle, L1|11/11',
+      '|-ability|p1a: Calyrex|As One', '|-ability|p1a: Calyrex|Unnerve', '|turn|1',
+      '|move|p1a: Calyrex|Glacial Lance|p2a: Shuckle', '|-damage|p2a: Shuckle|0 fnt',
+      '|faint|p2a: Shuckle', '|-boost|p1a: Calyrex|atk|1|[from] ability: Chilling Neigh',
+    ]);
+    expect(asOne.p1.active[0]!.ability).toBe('asoneglastrier');
+    expect(asOne.p1.active[0]!.baseAbility).toBe('asoneglastrier');
+    // Glastrier's Chilling Neigh is its own
+    const glastrier = play(9, [
+      '|switch|p1a: Glastrier|Glastrier, L50|175/175',
+      '|-boost|p1a: Glastrier|atk|1|[from] ability: Chilling Neigh',
+    ]);
+    expect(glastrier.p1.active[0]!.ability).toBe('chillingneigh');
 
     // Intimidate's boost names no ability
     const intimidate = play(9, [
@@ -319,6 +367,27 @@ describe('Handler', () => {
     expect(battle.p1.active[0]!.item).toBe('sitrusberry');
     expect(battle.p1.active[0]!.itemEffect).toBe('bestowed');
     expect(battle.p1.active[1]!.item).toBe('');
+
+    // the sim still runs an ability that Mummy or Wandering Spirit replaced in the same hit
+    const mummy = play(9, [
+      '|switch|p1a: Sneasler|Sneasler, L50, M|155/155',
+      '|switch|p2a: Cofagrigus|Cofagrigus, L50, M|133/133', '|turn|1',
+      '|move|p1a: Sneasler|Shadow Claw|p2a: Cofagrigus', '|-damage|p2a: Cofagrigus|100/133',
+      '|-activate|p2a: Cofagrigus|ability: Mummy|p1a: Sneasler|[ability] Poison Touch',
+      '|-status|p2a: Cofagrigus|psn|[from] ability: Poison Touch|[of] p1a: Sneasler',
+    ]);
+    expect(mummy.p1.active[0]!.ability).toBe('mummy');
+    expect(mummy.p1.active[0]!.baseAbility).toBe('poisontouch');
+    const wandering = play(9, [
+      '|switch|p1a: Sneasler|Sneasler, L50, M|155/155',
+      '|switch|p2a: Runerigus|Runerigus, L50, M|133/133', '|turn|1',
+      '|move|p1a: Sneasler|Shadow Claw|p2a: Runerigus', '|-damage|p2a: Runerigus|100/133',
+      '|-activate|p1a: Sneasler|Skill Swap|Wandering Spirit|Poison Touch|[of] p2a: Runerigus',
+      '|-status|p2a: Runerigus|psn|[from] ability: Poison Touch|[of] p1a: Sneasler',
+    ]);
+    expect(wandering.p1.active[0]!.ability).toBe('wanderingspirit');
+    expect(wandering.p1.active[0]!.baseAbility).toBe('poisontouch');
+    expect(wandering.p2.active[0]!.ability).toBe('poisontouch');
   });
 
   it('|-endability|', () => {

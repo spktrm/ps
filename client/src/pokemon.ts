@@ -881,7 +881,12 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   }
 
   rememberAbility(ability: string, isNotBase?: boolean) {
-    this.ability = this.side.battle.get('abilities', ability).id;
+    const id = this.side.battle.get('abilities', ability).id;
+    // As One shows as the abilities it joins, but Calyrex's forme says which As One it is
+    const joins = AS_ONE[id];
+    const asOne = joins &&
+      Object.values(this.species.abilities).map(toID).find(a => joins.includes(a));
+    this.ability = asOne || id;
     // a transformed Pokemon shows the ability it copied, not its own
     if (!this.baseAbility && !isNotBase && !this.volatiles.transform) {
       this.baseAbility = this.ability;
@@ -1074,6 +1079,14 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     this.side = null!;
   }
 }
+
+// The As Ones the sim logs as As One, then Unnerve, and whose boost is Chilling or Grim Neigh
+const AS_ONE: {[id: string]: ID[] | undefined} = {
+  asone: ['asoneglastrier' as ID, 'asonespectrier' as ID],
+  unnerve: ['asoneglastrier' as ID, 'asonespectrier' as ID],
+  chillingneigh: ['asoneglastrier' as ID],
+  grimneigh: ['asonespectrier' as ID],
+};
 
 // The fields Pokemon#clone copies by name, read off its first copy
 let POKEMON_FIELDS: Set<string> | undefined;

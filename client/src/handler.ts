@@ -22,10 +22,51 @@ export class Handler implements Protocol.Handler {
   // the items used up since the last move, switch or turn, whether each was known to be held, and
   // whether its holder was hurt or healed since, which no item handed over and used up at once does
   private readonly usedUp: Array<{pokemon: Pokemon; item: ID; known: boolean; stale: boolean}> = [];
+  // the abilities replaced since then, which the sim still runs if their event had begun
+  private readonly replaced: Array<{pokemon: Pokemon; ability: ID}> = [];
+  // the berries eaten since then off another Pokemon, by Bug Bite or Pluck
+  private readonly eaten: Array<{pokemon: Pokemon; item: ID}> = [];
+  // the move in progress, its user and its target
+  private current: {pokemon: Pokemon; move: ID; target: Pokemon | null} | null = null;
 
   constructor(battle: Battle, player: ID | null = null) {
     this.battle = battle;
     this.player = player;
+  }
+
+  // A move, switch or turn starts what the sim does in one afresh
+  private begin(current: Handler['current'] = null) {
+    this.usedUp.length = 0;
+    this.replaced.length = 0;
+    this.eaten.length = 0;
+    this.current = current;
+  }
+
+  // Reveals the ability an effect names, unless the sim ran it after replacing it
+  private reveal(poke: Pokemon | null | undefined, effect?: {kind: string; name: string}) {
+    if (!poke || effect?.kind !== 'Ability' || this.wasReplaced(poke, effect.name)) return;
+    poke.activateAbility(effect.name);
+  }
+
+  private wasReplaced(poke: Pokemon, ability: string) {
+    const id = toID(ability);
+    return this.replaced.some(r => r.pokemon === poke && r.ability === id);
+  }
+
+  // Notes that a Pokemon's ability was replaced, which it no longer is once given back
+  private replace(poke: Pokemon, old: string, now: string) {
+    const back = this.replaced.findIndex(r => r.pokemon === poke && r.ability === toID(now));
+    if (back >= 0) this.replaced.splice(back, 1);
+    if (old) this.replaced.push({pokemon: poke, ability: toID(old)});
+  }
+
+  // Whether an item healed a Pokemon that never held it: it ate it off another, or was flung it
+  private notHeld(poke: Pokemon, ofpoke: Pokemon | null, item: ID) {
+    const eaten = this.eaten.findIndex(e => e.pokemon === poke && e.item === item);
+    if (eaten >= 0) return !!this.eaten.splice(eaten, 1);
+    // Fling's berry heals its target [of] the flinger, before the flinger loses it
+    return !!ofpoke && ofpoke !== poke &&
+      this.current?.pokemon === ofpoke && this.current.move === 'fling';
   }
 
   // Whether the item the sim says it handed over was used up at once, which it logs first
@@ -65,7 +106,7 @@ export class Handler implements Protocol.Handler {
   }
 
   '|turn|'(args: Args['|turn|']) {
-    this.usedUp.length = 0;
+    this.begin();
     this.battle.setTurn(args[1]);
   }
 
@@ -209,7 +250,7 @@ export class Handler implements Protocol.Handler {
   }
 
   switch(args: Args['|switch|' | '|drag|' | '|replace|'], kwArgs?: KWArgs['|switch|']) {
-    this.usedUp.length = 0;
+    this.begin();
     const poke = this.battle.getSwitchedPokemon(args[1], args[2]);
     const slot = poke.slot;
     if (args[3]) poke.healthParse(args[3]);
@@ -249,7 +290,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     const move = this.battle.get('moves', args[2]) as Partial<Move> & NA;
     const poke2 = this.battle.getPokemon(args[3]);
-    this.usedUp.length = 0;
+    this.begin({pokemon: poke, move: move.id, target: poke2});
     this.battle.checkActive(poke);
     poke.useMove(move, poke2, kwArgs.from as Protocol.EffectName | MoveName, !!kwArgs.still);
   }
@@ -275,7 +316,7 @@ export class Handler implements Protocol.Handler {
     if (kwArgs.from) {
       const fromEffect = this.battle.get('conditions', kwArgs.from);
       const ofPoke = this.battle.getPokemon(kwArgs.of);
-      if (ofPoke) ofPoke.activateAbility(fromEffect);
+      this.reveal(ofPoke, fromEffect);
       if (fromEffect.kind === 'Item') {
         const itemPoke = ofPoke || poke;
         if (itemPoke.lastItem !== fromEffect.id &&
@@ -300,10 +341,10 @@ export class Handler implements Protocol.Handler {
     if (!fromEffect) return;
 
     const ofpoke = this.battle.getPokemon(kwArgs.of);
-    (ofpoke || poke).activateAbility(fromEffect);
+    this.reveal(ofpoke || poke, fromEffect);
     if (fromEffect.kind === 'Item' &&
       !CONSUMED.includes(poke.lastItemEffect as LastItemEffect) &&
-      poke.lastItem !== fromEffect.id) {
+      poke.lastItem !== fromEffect.id && !this.notHeld(poke, ofpoke, fromEffect.id)) {
       poke.item = fromEffect.id;
     }
     switch (fromEffect.id) {
@@ -359,7 +400,7 @@ export class Handler implements Protocol.Handler {
     if (!kwArgs.silent && kwArgs.from) {
       const fromEffect = this.battle.get('conditions', kwArgs.from);
       const ofPoke = this.battle.getPokemon(kwArgs.of);
-      (ofPoke || poke).activateAbility(fromEffect);
+      this.reveal(ofPoke || poke, fromEffect);
     }
   }
 
@@ -403,7 +444,7 @@ export class Handler implements Protocol.Handler {
     const poke2 = this.battle.getPokemon(args[2])!;
     if (!kwArgs.silent && kwArgs.from) {
       const fromEffect = this.battle.get('conditions', kwArgs.from);
-      poke.activateAbility(fromEffect);
+      this.reveal(poke, fromEffect);
     }
     const boosts = args[3] ? args[3].split(', ') as BoostID[] : BOOSTS;
     for (const boost of boosts) {
@@ -428,7 +469,7 @@ export class Handler implements Protocol.Handler {
     if (!kwArgs.silent && kwArgs.from) {
       const fromEffect = this.battle.get('conditions', kwArgs.from);
       const ofPoke = this.battle.getPokemon(kwArgs.of);
-      (ofPoke || poke).activateAbility(fromEffect);
+      this.reveal(ofPoke || poke, fromEffect);
     }
   }
 
@@ -450,7 +491,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     const fromEffect = this.battle.get('conditions', kwArgs.from);
     const ofPoke = this.battle.getPokemon(kwArgs.of);
-    (ofPoke || poke).activateAbility(fromEffect);
+    this.reveal(ofPoke || poke, fromEffect);
   }
 
   '|-fail|'(args: Args['|-fail|'], kwArgs: KWArgs['|-fail|']) {
@@ -460,7 +501,7 @@ export class Handler implements Protocol.Handler {
     if (fromEffect.id === 'clearamulet') {
       ofPoke!.item = fromEffect.id;
     } else {
-      (ofPoke || poke).activateAbility(fromEffect);
+      this.reveal(ofPoke || poke, fromEffect);
     }
   }
 
@@ -468,7 +509,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1])!;
     const effect = this.battle.get('conditions', args[2]);
     const ofPoke = this.battle.getPokemon(kwArgs.of);
-    (ofPoke || poke).activateAbility(effect);
+    this.reveal(ofPoke || poke, effect);
     switch (effect?.id) {
       case 'quickguard': case 'wideguard': case 'craftyshield': case 'matblock':
         return void poke.side.addSideCondition(effect, false);
@@ -492,7 +533,7 @@ export class Handler implements Protocol.Handler {
     // a new status starts its counters again, as does Gen 2 Rest through Sleep Talk
     poke.setStatus(status);
     poke.removeVolatile('yawn' as ID);
-    ofpoke.activateAbility(fromEffect);
+    this.reveal(ofpoke, fromEffect);
 
     if (fromEffect?.kind === 'Item') ofpoke.item = fromEffect.id;
 
@@ -632,7 +673,12 @@ export class Handler implements Protocol.Handler {
           }
           return;
         }
-        case 'stealeat': return void (poke.lastItemEffect = 'stolen');
+        case 'stealeat': {
+          // Bug Bite and Pluck eat the berry, which then acts [from] the eater's item
+          const eater = this.battle.getPokemon(kwArgs.of);
+          if (eater) this.eaten.push({pokemon: eater, item: item.id});
+          return void (poke.lastItemEffect = 'stolen');
+        }
         case 'gem': return void (poke.lastItemEffect = 'consumed');
         case 'incinerate': return void (poke.lastItemEffect = 'incinerated');
       }
@@ -655,16 +701,21 @@ export class Handler implements Protocol.Handler {
     const oldAbility = this.battle.get('abilities', args[3]);
     const fromEffect = this.battle.get('conditions', kwArgs.from);
     const ofPoke = this.battle.getPokemon(kwArgs.of);
+    const changed = oldAbility.kind === 'Ability';
+    if (!changed && this.wasReplaced(poke, ability.name)) return;
 
     poke.rememberAbility(ability.name, !!(fromEffect?.id && !kwArgs.fail));
 
     if (kwArgs.silent) return; // do nothing
 
     // a changed ability names the one it replaced, the base ability unless one is known
-    if (oldAbility.kind === 'Ability') {
+    if (changed) {
       poke.activateAbility(oldAbility.name);
       poke.activateAbility(ability.name, true);
-      ofPoke?.rememberAbility(ability.name);
+      this.replace(poke, oldAbility.name, ability.name);
+      // the Pokemon it came from has it, as Doodle's target does though Doodle logs no [of]
+      const from = ofPoke || (fromEffect.id === 'doodle' ? this.current?.target : null);
+      from?.rememberAbility(ability.name);
       return;
     }
 
@@ -725,7 +776,7 @@ export class Handler implements Protocol.Handler {
     const fromEffect = this.battle.get('conditions', kwArgs.from);
     if (poke === poke2) throw new Error('Transforming into self');
 
-    if (!kwArgs.silent) poke.activateAbility(fromEffect);
+    if (!kwArgs.silent) this.reveal(poke, fromEffect);
 
     poke.boosts = {...poke2.boosts};
     poke.copyTypesFrom(poke2, true);
@@ -754,7 +805,7 @@ export class Handler implements Protocol.Handler {
     }
 
     if (!kwArgs.silent && kwArgs.from) {
-      poke.activateAbility(this.battle.get('conditions', kwArgs.from));
+      this.reveal(poke, this.battle.get('conditions', kwArgs.from));
     }
 
     // the formechange volatile reminds us to revert the sprite change on switch-out
@@ -797,8 +848,8 @@ export class Handler implements Protocol.Handler {
     const ofPoke = this.battle.getPokemon(kwArgs.of);
     const fromEffect = this.battle.get('conditions', kwArgs.from);
 
-    poke.activateAbility(effect);
-    (ofPoke || poke).activateAbility(fromEffect);
+    this.reveal(poke, effect);
+    this.reveal(ofPoke || poke, fromEffect);
 
     if (effect.id.startsWith('stockpile')) {
       poke.addVolatile('stockpile' as ID, {level: +effect.id.charAt(effect.id.length - 1)});
@@ -886,7 +937,7 @@ export class Handler implements Protocol.Handler {
     const poke = this.battle.getPokemon(args[1]);
     const effect = this.battle.get('conditions', args[2]);
     const poke2 = this.battle.getPokemon(args[3] as PokemonIdent);
-    if (poke) poke.activateAbility(effect);
+    this.reveal(poke, effect);
 
     switch (effect.id) {
       case 'poltergeist':
@@ -934,6 +985,8 @@ export class Handler implements Protocol.Handler {
         if (targetability) poke!.rememberAbility(targetability);
         if (pokeability) poke!.rememberAbility(pokeability, true);
         if (targetability) poke2!.rememberAbility(targetability, true);
+        this.replace(poke!, targetability, pokeability);
+        this.replace(poke2!, pokeability, targetability);
         break;
       }
 
@@ -960,6 +1013,7 @@ export class Handler implements Protocol.Handler {
         poke2!.activateAbility(ability.name);
         if (poke) poke.activateAbility(effect.name);
         poke2!.activateAbility(effect.name, true);
+        this.replace(poke2!, ability.name, effect.name);
         break;
       }
 
@@ -1014,7 +1068,7 @@ export class Handler implements Protocol.Handler {
     const effect = this.battle.get('conditions', args[1]);
     const fromEffect = this.battle.get('conditions', kwArgs.from);
     const ofPoke = this.battle.getPokemon(kwArgs.of);
-    if (ofPoke && fromEffect) ofPoke.activateAbility(fromEffect);
+    this.reveal(ofPoke, fromEffect);
 
     if (effect.id.endsWith('terrain')) {
       this.battle.field.setTerrain(effect.id);
