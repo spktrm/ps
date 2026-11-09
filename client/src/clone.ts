@@ -1,6 +1,23 @@
 /** Every object a clone has copied, mapped from the original to its copy. */
 export type CloneMemo = Map<object, object>;
 
+// the key instancesOnly marks a memo with
+const INSTANCES_ONLY = {};
+
+/**
+ * Marks `memo` so that clones leave out of it the state a Pokémon alone holds (its status, boosts,
+ * volatiles, move slots and the moves it used), recording the client's objects and the rest.
+ */
+export function instancesOnly(memo: CloneMemo = new Map()): CloneMemo {
+  memo.set(INSTANCES_ONLY, INSTANCES_ONLY);
+  return memo;
+}
+
+/** Whether clones record in `memo` every object they copy. */
+export function recordsAll(memo: CloneMemo) {
+  return !memo.has(INSTANCES_ONLY);
+}
+
 // the client's classes, whose objects are cloned instead of shared
 const CLONEABLE: Array<abstract new (...args: any[]) => {clone(memo: CloneMemo): object}> = [];
 

@@ -88,7 +88,9 @@ application.
   the original (eg. to search from a position), sharing only its data and the requests it was
   sent, which it never changes. Every object the clone copies is recorded in `memo`, keyed by the
   original, so that references to the battle's objects held outside of it can be followed to their
-  copies.
+  copies. A memo made with `instancesOnly()` leaves out the state only a `Pokemon` holds (its
+  status, boosts, volatiles, move slots and the moves it used), which makes cloning faster when
+  nothing outside the battle refers to that state.
 
 ## License
 

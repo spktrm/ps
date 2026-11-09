@@ -8,7 +8,7 @@ import {
 } from '@pkmn/protocol';
 
 import {NA} from './battle';
-import {CloneMemo, Fields, cloneable, copy, copyRest, fieldsOf, keep} from './clone';
+import {CloneMemo, Fields, cloneable, copy, copyRest, fieldsOf, keep, recordsAll} from './clone';
 import {Side} from './side';
 
 interface EffectState {
@@ -1035,11 +1035,14 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.newlySwitched = this.newlySwitched;
     pokemon.beingCalledBack = this.beingCalledBack;
     pokemon.statusStage = this.statusStage;
-    // these hold only numbers
+    // these hold only numbers, and only this Pokemon holds them
     const {statusState, boosts} = this;
-    pokemon.statusState = memo.get(statusState) || keep(statusState, {...statusState}, memo);
-    pokemon.boosts = memo.get(boosts) || keep(boosts, {...boosts}, memo);
-    pokemon.volatiles = memo.get(this.volatiles) || copyVolatiles(this.volatiles, memo);
+    const all = recordsAll(memo);
+    pokemon.statusState = !all ? {...statusState}
+      : memo.get(statusState) || keep(statusState, {...statusState}, memo);
+    pokemon.boosts = !all ? {...boosts} : memo.get(boosts) || keep(boosts, {...boosts}, memo);
+    pokemon.volatiles =
+      (all && memo.get(this.volatiles)) || copyVolatiles(this.volatiles, memo, all);
     pokemon.ability = this.ability;
     pokemon.baseAbility = this.baseAbility;
     pokemon.illusion = this.illusion?.clone(memo);
@@ -1052,7 +1055,7 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.nature = this.nature;
     pokemon.hpType = this.hpType;
     pokemon.terastallized = this.terastallized;
-    pokemon.moveSlots = memo.get(this.moveSlots) || copySlots(this.moveSlots, memo);
+    pokemon.moveSlots = (all && memo.get(this.moveSlots)) || copySlots(this.moveSlots, memo, all);
     // parts of a request, which copies share
     pokemon.maxMoves = this.maxMoves;
     pokemon.zMoves = this.zMoves;
@@ -1068,7 +1071,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.lastMoveTargetLoc = this.lastMoveTargetLoc;
     pokemon.moveThisTurn = this.moveThisTurn;
     pokemon.hurtThisTurn = this.hurtThisTurn;
-    pokemon.movesUsedWhileActive = copy(this.movesUsedWhileActive, memo);
+    pokemon.movesUsedWhileActive =
+      all ? copy(this.movesUsedWhileActive, memo) : this.movesUsedWhileActive.slice();
     pokemon.timesAttacked = this.timesAttacked;
     pokemon.choiceLock = this.choiceLock;
     // never changed once taken, so copies can share it
@@ -1102,15 +1106,16 @@ const BLANK: DetailedPokemon = {
   ident: '' as PokemonIdent, searchid: '' as PokemonSearchID,
 };
 
-// Copies a volatiles table and the state of each effect in it
-function copyVolatiles(volatiles: EffectTable, memo: CloneMemo) {
+// Copies a volatiles table and the state of each effect in it, recording them if `all`
+function copyVolatiles(volatiles: EffectTable, memo: CloneMemo, all: boolean) {
   const out: EffectTable = {};
-  memo.set(volatiles, out);
+  if (all) memo.set(volatiles, out);
   for (const id in volatiles) {
     const state = volatiles[id];
-    let copied = memo.get(state) as EffectState | undefined;
+    let copied = all ? memo.get(state) as EffectState | undefined : undefined;
     if (!copied) {
-      copied = keep(state, {...state}, memo);
+      copied = {...state};
+      if (all) memo.set(state, copied);
       for (const key in copied) {
         const value = (copied as any)[key];
         if (value !== null && typeof value === 'object') (copied as any)[key] = copy(value, memo);
@@ -1121,15 +1126,16 @@ function copyVolatiles(volatiles: EffectTable, memo: CloneMemo) {
   return out;
 }
 
-// Copies a list of move slots and each slot in it
-function copySlots(slots: MoveSlot[], memo: CloneMemo) {
+// Copies a list of move slots and each slot in it, recording them if `all`
+function copySlots(slots: MoveSlot[], memo: CloneMemo, all: boolean) {
   const out = new Array<MoveSlot>(slots.length);
-  memo.set(slots, out);
+  if (all) memo.set(slots, out);
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i];
-    let copied = memo.get(slot) as MoveSlot | undefined;
+    let copied = all ? memo.get(slot) as MoveSlot | undefined : undefined;
     if (!copied) {
-      copied = keep(slot, {...slot}, memo);
+      copied = {...slot};
+      if (all) memo.set(slot, copied);
       for (const key in copied) {
         const value = (copied as any)[key];
         if (value !== null && typeof value === 'object') (copied as any)[key] = copy(value, memo);

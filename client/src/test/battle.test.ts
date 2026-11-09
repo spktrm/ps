@@ -2,7 +2,7 @@ import {Generations, ID} from '@pkmn/data';
 import {Dex} from '@pkmn/dex';
 import {DetailedPokemon, PokemonIdent, Username} from '@pkmn/protocol';
 
-import {Battle, Pokemon} from '../index';
+import {Battle, Pokemon, instancesOnly} from '../index';
 
 const GENS = new Generations(Dex);
 
@@ -373,6 +373,23 @@ describe('Battle', () => {
     freshClone.add('|gametype|freeforall');
     expect(freshClone.p3!.battle).toBe(freshClone);
     expect(fresh.p3).toBeUndefined();
+
+    // an instances-only memo records the client's objects, not what a Pokemon alone holds
+    const only = instancesOnly();
+    const lean = battle.clone(only);
+    const leanMew = lean.p2.active[0]!;
+    expect(only.get(battle)).toBe(lean);
+    expect(only.get(mew)).toBe(leanMew);
+    expect(only.get(battle.p2)).toBe(lean.p2);
+    expect(leanMew.hp).toBe(50);
+    const gengar = battle.p1.active[0]!;
+    const leanGengar = lean.p1.active[0]!;
+    expect(gengar.moveSlots).toHaveLength(1);
+    expect(only.has(gengar.moveSlots)).toBe(false);
+    expect(only.has(gengar.moveSlots[0])).toBe(false);
+    expect(only.has(gengar.boosts)).toBe(false);
+    expect(leanGengar.moveSlots[0]).not.toBe(gengar.moveSlots[0]);
+    expect(leanGengar.moveSlots).toEqual(gengar.moveSlots);
   });
 
   it('#destroy', () => {
