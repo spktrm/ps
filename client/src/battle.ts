@@ -21,6 +21,10 @@ function logged(id: ID) {
   return power ? power[1] as ID : id;
 }
 
+type Handle = (args: ArgType, kwArgs: BattleArgsKWArgType) => void;
+// The handler's method for each command, or null where it has none
+const HANDLES = new Map<string, Handle | null>();
+
 export const NULL = {name: '', id: '' as ID, kind: 'Condition' as DataKind};
 export type NA = typeof NULL;
 
@@ -107,9 +111,15 @@ export class Battle {
   add(a: ArgType | string, b: BattleArgsKWArgType = {}) {
     const {args, kwArgs} =
       typeof a === 'string' ? Protocol.parseBattleLine(a) : {args: a, kwArgs: b};
-    const key = Protocol.key(args);
-    if (!key) return;
-    if (key in this.handler) (this.handler as any)[key](args, kwArgs);
+    let handle = HANDLES.get(args[0]);
+    if (handle === undefined) {
+      const key = Protocol.key(args);
+      // a tournament line's key depends on more than its command, and none has a handler
+      handle = key && args[0] !== 'tournament' && key in Handler.prototype
+        ? (Handler.prototype as any)[key] as Handle : null;
+      HANDLES.set(args[0], handle);
+    }
+    if (handle) handle.call(this.handler, args, kwArgs);
   }
 
   update(request: Protocol.Request) {
@@ -213,11 +223,18 @@ export class Battle {
   // truth and if the client is out of date it should degrade gracefully
   get(type: 'abilities' | 'items' | 'moves' | 'species' | 'conditions', s?: string) {
     if (!s) return NULL;
+    let t = type;
+    let name = s;
     // @pkmn/sim's Dex gives ability and item effects prefixed ids, so look them up as themselves
-    const [t, name] = type !== 'conditions' ? [type, s]
-      : s.startsWith('ability:') ? ['abilities', s.slice(8)] as const
-      : s.startsWith('item:') ? ['items', s.slice(5)] as const
-      : [type, s];
+    if (type === 'conditions') {
+      if (s.startsWith('ability:')) {
+        t = 'abilities';
+        name = s.slice(8);
+      } else if (s.startsWith('item:')) {
+        t = 'items';
+        name = s.slice(5);
+      }
+    }
     return this.gen[t].get(name) || {name: s, id: toID(s), kind: 'Condition'};
   }
 
@@ -278,14 +295,18 @@ export class Battle {
 
     let siden = -1;
     let slot = -1; // if there is an explicit slot for this pokemon
-    if (/^p[1-9]($|: )/.test(name)) {
-      siden = parseInt(name.charAt(1)) - 1;
-      name = name.slice(4);
-    } else if (/^p[1-9][a-f]: /.test(name)) {
-      siden = parseInt(name.charAt(1)) - 1;
-      slot = SLOTS[name.charAt(2)];
-      name = name.slice(5);
-      pokemonid = `p${siden + 1}: ${name}` as PokemonIdent;
+    // p1 or p1: Name, else p1a: Name
+    const n = name.charCodeAt(1) - 48;
+    if (name.charAt(0) === 'p' && n >= 1 && n <= 9) {
+      if (name.length === 2 || name.startsWith(': ', 2)) {
+        siden = n - 1;
+        name = name.slice(4);
+      } else if (SLOTS[name.charAt(2)] !== undefined && name.startsWith(': ', 3)) {
+        siden = n - 1;
+        slot = SLOTS[name.charAt(2)];
+        name = name.slice(5);
+        pokemonid = `p${siden + 1}: ${name}` as PokemonIdent;
+      }
     }
 
     return {name, siden, slot, pokemonid};
@@ -517,9 +538,13 @@ export class Battle {
   }
 
   ngasActive() {
-    for (const active of this.getAllActive()) {
-      if (active.ability === 'neutralizinggas' && !active.volatiles['gastroacid']) {
-        return true;
+    // the Pokemon getAllActive lists, without making the list
+    for (let i = 0; i < 2; i++) {
+      for (const active of this.sides[i].active) {
+        if (active && !active.fainted && active.ability === 'neutralizinggas' &&
+          !active.volatiles['gastroacid']) {
+          return true;
+        }
       }
     }
     return false;

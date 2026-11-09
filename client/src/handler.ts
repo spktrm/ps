@@ -36,9 +36,9 @@ export class Handler implements Protocol.Handler {
 
   // A move, switch or turn starts what the sim does in one afresh
   private begin(current: Handler['current'] = null) {
-    this.usedUp.length = 0;
-    this.replaced.length = 0;
-    this.eaten.length = 0;
+    if (this.usedUp.length) this.usedUp.length = 0;
+    if (this.replaced.length) this.replaced.length = 0;
+    if (this.eaten.length) this.eaten.length = 0;
     this.current = current;
   }
 
