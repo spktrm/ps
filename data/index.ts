@@ -1,4 +1,5 @@
 import {
+  Ability,
   AbilityName,
   Condition,
   Data,
@@ -11,6 +12,7 @@ import {
   GenderName,
   GenerationNum,
   ID,
+  Item,
   ItemName,
   Move,
   MoveCategory,
@@ -130,6 +132,8 @@ export class Generation {
 }
 
 export class Abilities {
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Ability | null>();
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
 
@@ -139,8 +143,12 @@ export class Abilities {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
     const ability = this.dex.abilities.get(name);
-    return this.exists(ability) ? ability : undefined;
+    const found = this.exists(ability) ? ability : undefined;
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
   }
 
   *[Symbol.iterator]() {
@@ -152,6 +160,8 @@ export class Abilities {
 }
 
 export class Items {
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Item | null>();
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
 
@@ -161,8 +171,12 @@ export class Items {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
     const item = this.dex.items.get(name);
-    return this.exists(item) ? item : undefined;
+    const found = this.exists(item) ? item : undefined;
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
   }
 
   *[Symbol.iterator]() {
@@ -174,6 +188,8 @@ export class Items {
 }
 
 export class Moves {
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Move | null>();
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
 
@@ -183,8 +199,12 @@ export class Moves {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
     const move = this.dex.moves.get(name);
-    return this.exists(move) ? move : undefined;
+    const found = this.exists(move) ? move : undefined;
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
   }
 
   *[Symbol.iterator]() {
@@ -197,6 +217,8 @@ export class Moves {
 
 export class Species {
   /* private */ readonly cache = Object.create(null) as {[id: string]: Specie};
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Specie | null>();
 
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
@@ -207,6 +229,14 @@ export class Species {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
+    const found = this.find(name);
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
+  }
+
+  /* private */ find(name: string) {
     const species = this.dex.species.get(name);
     if (!this.exists(species)) return undefined;
     const id = (species as any).speciesid || species.id; // FIXME Event-only ability hack
@@ -346,6 +376,8 @@ export class Specie implements DexSpecies {
 }
 
 export class Conditions {
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Condition | null>();
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
 
@@ -355,12 +387,18 @@ export class Conditions {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
     const condition = this.dex.conditions.get(name);
-    return this.exists(condition) ? condition : undefined;
+    const found = this.exists(condition) ? condition : undefined;
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
   }
 }
 
 export class Natures {
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Nature | null>();
   /* private */ readonly dex: Dex;
   /* private */ readonly exists: BoundExistsFn;
 
@@ -371,8 +409,12 @@ export class Natures {
 
   get(name: string) {
     if (this.dex.gen < 3) return undefined;
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
     const nature = this.dex.natures.get(name);
-    return this.exists(nature) ? nature : undefined;
+    const found = this.exists(nature) ? nature : undefined;
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
   }
 
   *[Symbol.iterator]() {
@@ -397,6 +439,8 @@ type TypeTarget = {getTypes: () => TypeName[]} | {types: TypeName[]} | TypeName[
 
 export class Types {
   /* private */ readonly cache = Object.create(null) as {[id: string]: Type};
+  // what each name looked up found, as neither the data nor exists change
+  /* private */ readonly byName = new Map<string, Type | null>();
 
   /* private */ readonly unknown: Type;
   /* private */ readonly dex: Dex;
@@ -424,6 +468,14 @@ export class Types {
   }
 
   get(name: string) {
+    const known = this.byName.get(name);
+    if (known !== undefined) return known ?? undefined;
+    const found = this.find(name);
+    if (typeof name === 'string') this.byName.set(name, found ?? null);
+    return found;
+  }
+
+  /* private */ find(name: string) {
     if (name === '???' && this.dex.gen >= 2 && this.dex.gen <= 4) return this.unknown;
     const type = this.dex.types.get(name);
     if (!this.exists(type)) return undefined;
