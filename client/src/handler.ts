@@ -117,7 +117,8 @@ export class Handler implements Protocol.Handler {
   }
 
   '|request|'(args: Args['|request|']) {
-    if (!args[1]) return;
+    // the sim sends a null request to a side whose request the battle ended before it sent
+    if (!args[1] || args[1] === 'null') return;
     this.battle.update(Protocol.parseRequest(args[1]));
   }
 

@@ -2,7 +2,7 @@ import {Generations, ID} from '@pkmn/data';
 import {Dex} from '@pkmn/dex';
 import {DetailedPokemon, PokemonIdent, Username} from '@pkmn/protocol';
 
-import {Battle} from '../index';
+import {Battle, Pokemon} from '../index';
 
 const GENS = new Generations(Dex);
 
@@ -229,6 +229,102 @@ describe('Battle', () => {
     expect(battle.field.weather).toBeUndefined();
     expect(battle.field.weatherState.id).toBe('');
     expect(battle.lastMove).toBe('');
+  });
+
+  it('#update', () => {
+    const gen = GENS.get(9);
+    // p1's request for its one Pokemon, with the PP each move has used (of 5 for a transformed
+    // Pokemon's copies), or only the move it is locked into
+    const request = (name: string, ids: string[], used: number[] | string, copies = false) => {
+      const move = (id: string) => gen.moves.get(id)!;
+      const moves = typeof used === 'string' ? [{move: move(used).name, id: used}]
+        : ids.map((id, i) => {
+          const maxpp = copies ? 5 : move(id).pp * 8 / 5;
+          return {
+            move: move(id).name, id, pp: maxpp - used[i], maxpp,
+            target: move(id).target, disabled: false,
+          };
+        });
+      return '|request|' + JSON.stringify({
+        active: [{moves}],
+        side: {name: 'Alice', id: 'p1', pokemon: [{
+          ident: `p1: ${name}`, details: `${name}, L50`, condition: '150/150', active: true,
+          stats: {atk: 100, def: 100, spa: 100, spd: 100, spe: 100}, moves: ids,
+          baseAbility: 'innerfocus', item: '', pokeball: 'pokeball', ability: 'innerfocus',
+        }]},
+        rqid: 1,
+      });
+    };
+    const start = (battle: Battle, p1: string, p2: string) => {
+      for (const line of [
+        '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|singles', '|gen|9',
+        `|switch|p1a: ${p1}|${p1}, L50|150/150`, `|switch|p2a: ${p2}|${p2}, L50|100/100`,
+        '|turn|1',
+      ]) battle.add(line);
+    };
+    const pp = (poke: Pokemon) =>
+      poke.moveSlots.map(m => `${m.id}:${JSON.stringify(m.ppUsed)}${m.virtual ? 'v' : ''}`);
+
+    const moves = ['outrage', 'extremespeed', 'earthquake', 'roost'];
+    const battle = new Battle(GENS);
+    start(battle, 'Dragonite', 'Snorlax');
+    battle.add(request('Dragonite', moves, [0, 0, 1, 0]));
+    const dnite = battle.p1.active[0]!;
+    expect(pp(dnite)).toEqual(['outrage:0', 'extremespeed:0', 'earthquake:1', 'roost:0']);
+    // a move after the request takes its PP from the request's slot
+    battle.add('|move|p1a: Dragonite|Outrage|p2a: Snorlax');
+    expect(pp(dnite)).toEqual(['outrage:1', 'extremespeed:0', 'earthquake:1', 'roost:0']);
+    // a request locked into a move doesn't say what the others have left
+    battle.add('|turn|2');
+    battle.add(request('Dragonite', moves, 'outrage'));
+    expect(pp(dnite)).toEqual(['outrage:1', 'extremespeed:0', 'earthquake:1', 'roost:0']);
+    // nor does the null request the sim sends once the battle is over
+    battle.add('|request|null');
+    expect(pp(dnite)).toEqual(['outrage:1', 'extremespeed:0', 'earthquake:1', 'roost:0']);
+
+    // a transformed Pokemon's request lists its own copies of its target's moves
+    const imposter = new Battle(GENS);
+    start(imposter, 'Ditto', 'Dragonite');
+    imposter.add('|move|p2a: Dragonite|Outrage|p1a: Ditto');
+    imposter.add('|-transform|p1a: Ditto|p2a: Dragonite|[from] ability: Imposter');
+    imposter.add(request('Ditto', moves, [1, 0, 0, 0], true));
+    const ditto = imposter.p1.active[0]!;
+    const target = imposter.p2.active[0]!;
+    // which shows the target's moves, but not the PP the target used
+    expect(pp(target)).toEqual(['outrage:1', 'extremespeed:0', 'earthquake:0', 'roost:0']);
+    expect(pp(ditto)).toEqual(['outrage:1v', 'extremespeed:0v', 'earthquake:0v', 'roost:0v']);
+
+    // before Gen 6 a request names Hidden Power and Return with their type and power, and before
+    // Gen 7 it names only the base ability
+    const old = new Battle(GENS);
+    for (const line of [
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|singles', '|gen|3',
+      '|switch|p1a: Gardevoir|Gardevoir, L50, F|150/150',
+      '|switch|p2a: Persian|Persian, L50, M|100/100',
+      '|-ability|p1a: Gardevoir|Limber|[from] ability: Trace|[of] p2a: Persian', '|turn|1',
+    ]) old.add(line);
+    const slot = (move: string, id: string, maxpp: number) =>
+      ({move, id, pp: maxpp, maxpp, target: 'normal', disabled: false});
+    old.add('|request|' + JSON.stringify({
+      active: [{moves: [
+        slot('Return 102', 'return', 32), slot('Hidden Power Fire 70', 'hiddenpower', 24),
+        slot('Psychic', 'psychic', 16), slot('Calm Mind', 'calmmind', 32),
+      ]}],
+      side: {name: 'Alice', id: 'p1', pokemon: [{
+        ident: 'p1: Gardevoir', details: 'Gardevoir, L50, F', condition: '150/150', active: true,
+        stats: {atk: 100, def: 100, spa: 100, spd: 100, spe: 100},
+        moves: ['return102', 'hiddenpowerfire', 'psychic', 'calmmind'],
+        baseAbility: 'trace', item: '', pokeball: 'pokeball',
+      }]},
+      rqid: 1,
+    }));
+    old.add('|move|p1a: Gardevoir|Return|p2a: Persian');
+    const gardevoir = old.p1.active[0]!;
+    expect(pp(gardevoir)).toEqual(['return:1', 'hiddenpower:0', 'psychic:0', 'calmmind:0']);
+    expect(gardevoir.moveSlots.map(m => m.name))
+      .toEqual(['Return', 'Hidden Power', 'Psychic', 'Calm Mind']);
+    expect(gardevoir.ability).toBe('limber');
+    expect(gardevoir.baseAbility).toBe('trace');
   });
 
   it('#clone', () => {

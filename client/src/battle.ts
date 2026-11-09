@@ -2,7 +2,7 @@ import {
   DataKind, GameType, Generation, Generations, HPColor, ID, PokemonSet, SideID, toID,
 } from '@pkmn/data';
 import {
-  ArgType, BattleArgsKWArgType, FormatName, Message, PokemonDetails, PokemonHPStatus,
+  ArgType, BattleArgsKWArgType, FormatName, Message, MoveName, PokemonDetails, PokemonHPStatus,
   PokemonHealth, PokemonIdent, PokemonSearchID, Protocol, SpeciesName,
 } from '@pkmn/protocol';
 
@@ -13,6 +13,13 @@ import {Pokemon} from './pokemon';
 import {Side} from './side';
 
 const SLOTS: {[slot: string]: number} = {a: 0, b: 1, c: 2, d: 3, e: 4, f: 5};
+
+// The move the log names for one a request names with its type or power (Return 102)
+function logged(id: ID) {
+  if (id.startsWith('hiddenpower')) return 'hiddenpower' as ID;
+  const power = /^(return|frustration)\d+$/.exec(id);
+  return power ? power[1] as ID : id;
+}
 
 export const NULL = {name: '', id: '' as ID, kind: 'Condition' as DataKind};
 export type NA = typeof NULL;
@@ -128,7 +135,10 @@ export class Battle {
           pokemon.searchid = p.searchid;
           (pokemon as any).originalIdent = p.ident;
 
-          pokemon.ability = p.ability;
+          // before Gen 7 a request names only the base ability, which an active one may have lost
+          if (this.gen.num > 6 || !p.active || !(pokemon.ability || pokemon.volatiles.transform)) {
+            pokemon.ability = p.ability;
+          }
           pokemon.baseAbility = p.baseAbility;
           pokemon.item = p.item;
 
@@ -138,7 +148,7 @@ export class Battle {
           if (pokemon.status !== p.status) pokemon.setStatus(p.status);
           pokemon.fainted = !!p.fainted;
           for (const move of p.moves) {
-            pokemon.rememberMove(move, 0);
+            pokemon.rememberMove(logged(move), 0);
           }
           if (side.sets) {
             if (!pokemon.set || (pokemon.set.name || pokemon.set.species) !== p.name) {
@@ -163,11 +173,16 @@ export class Battle {
         for (const [slot, active] of request.active.entries()) {
           if (!active) continue;
           const poke = side.active[slot]!;
-          const mpoke = poke.volatiles.transform?.pokemon || poke;
-          mpoke.moveSlots = [];
-          for (const move of active.moves) {
-            if (move.id === 'struggle' || !('pp' in move)) continue;
-            mpoke.moveSlots.push({ppUsed: move.maxpp - move.pp, ...move});
+          // a transformed Pokemon's moves are its copies of its target's, kept beside its own
+          const virtual = !!poke.volatiles.transform;
+          // a locked move or Struggle comes without PP, and says nothing of the other moves
+          if (active.moves.every(move => 'pp' in move)) {
+            poke.moveSlots = virtual ? poke.moveSlots.filter(m => !m.virtual) : [];
+            for (const move of active.moves) {
+              const id = logged(move.id);
+              const name = id === move.id ? move.name : this.get('moves', id).name as MoveName;
+              poke.moveSlots.push({ppUsed: move.maxpp - move.pp, ...move, id, name, virtual});
+            }
           }
           poke.maxMoves = active.maxMoves;
           poke.zMoves = active.zMoves;
