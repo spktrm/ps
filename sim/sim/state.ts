@@ -63,6 +63,9 @@ const POKEMON = new Set([
 	'happiness', 'level', 'pokeball', 'baseMoveSlots',
 ]);
 const CHOICE = new Set(['switchIns']);
+const POKEMON_ACCESSORS: { [key: string]: string } = {
+	_baseSpecies: 'baseSpecies', _status: 'status', _ability: 'ability', _item: 'item',
+};
 const ACTIVE_MOVE = new Set(['move']);
 
 // what State.cloneBattle has made so far, so references can point at the copies
@@ -203,15 +206,7 @@ export const State = new class {
 		for (const [i, side] of source.sides.entries()) {
 			this.fillSide(side, i, copy);
 		}
-		// like deserializeBattle, work out the requests again
-		const battle = copy.battle;
-		if (source.sides.some(side => side.activeRequest !== null)) {
-			const requests = battle.getRequests(battle.requestState);
-			for (const [i, side] of source.sides.entries()) {
-				battle.sides[i].activeRequest = side.activeRequest === null ? null : requests[i];
-			}
-		}
-		return battle;
+		return copy.battle;
 	}
 
 	fillBattle(source: Battle, copy: BattleCopy) {
@@ -267,8 +262,8 @@ export const State = new class {
 				side.choice = choice;
 				break;
 			}
-			// worked out again once everything is copied
-			case 'activeRequest': side.activeRequest = null; break;
+			// requests are plain data, so they're copied rather than worked out again
+			case 'activeRequest': side.activeRequest = this.cloneWithRefs(source.activeRequest, copy); break;
 			default: this.copyProperty(side, key, (source as AnyObject)[key], SIDE.has(key), copy);
 			}
 		}
@@ -355,16 +350,17 @@ export const State = new class {
 				return arr;
 			}
 
-			if (this.isActiveMove(obj)) return this.cloneActiveMove(obj, copy);
-			if (this.isReferable(obj)) {
+			// most objects are plain ones, like effect states
+			if (obj.constructor !== Object || this.isActiveMove(obj)) {
+				if (this.isActiveMove(obj)) return this.cloneActiveMove(obj, copy);
+				if (!this.isReferable(obj)) {
+					throw new TypeError(`Unsupported type ${obj.constructor.name}: ${obj as any}`);
+				}
 				if (obj instanceof Pokemon) return copy.pokemon[obj.side.n][obj.position];
 				if (obj instanceof Side) return copy.sides[obj.n];
 				if (obj instanceof Field) return copy.field;
 				if (obj instanceof Battle) return copy.battle;
 				return obj;
-			}
-			if (obj.constructor !== Object) {
-				throw new TypeError(`Unsupported type ${obj.constructor.name}: ${obj as any}`);
 			}
 
 			const o: any = {};
@@ -438,7 +434,12 @@ export const State = new class {
 	}
 
 	serializePokemon(pokemon: Pokemon): /* Pokemon */ AnyObject {
-		const state: /* Pokemon */ AnyObject = this.serialize(pokemon, POKEMON, pokemon.battle);
+		const fields: /* Pokemon */ AnyObject = this.serialize(pokemon, POKEMON, pokemon.battle);
+		// fields with accessors are kept under another name, but serialized under their own
+		const state: /* Pokemon */ AnyObject = {};
+		for (const key in fields) {
+			state[POKEMON_ACCESSORS[key] || key] = fields[key];
+		}
 		state.set = pokemon.set;
 		// Only serialize the baseMoveSlots if they differ from moveSlots. We could get fancy and
 		// only serialize the diff and its index but thats overkill for a pretty niche case anyway.
