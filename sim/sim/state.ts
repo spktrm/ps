@@ -54,13 +54,13 @@ type Referable = Battle | Field | Side | Pokemon | Condition | Ability | Item | 
 const BATTLE = new Set([
 	'dex', 'gen', 'ruleTable', 'id', 'log', 'inherit', 'format', 'teamGenerator',
 	'HIT_SUBSTITUTE', 'NOT_FAIL', 'FAIL', 'SILENT_FAIL', 'field', 'sides', 'prng', 'hints',
-	'deserialized', 'queue', 'actions', 'presentCallbackNames', 'presentEffects', 'effectsAdded',
+	'deserialized', 'queue', 'actions', 'presentCallbacks', 'presentEffects', 'effectsAdded', 'untargetedEffects',
 ]);
 const FIELD = new Set(['id', 'battle']);
-const SIDE = new Set(['battle', 'team', 'pokemon', 'choice', 'activeRequest']);
+const SIDE = new Set(['battle', 'team', 'pokemon', 'choice', 'activeRequest', 'effectsChanged']);
 const POKEMON = new Set([
 	'side', 'battle', 'set', 'name', 'fullname', 'id',
-	'happiness', 'level', 'pokeball', 'baseMoveSlots',
+	'happiness', 'level', 'pokeball', 'baseMoveSlots', 'effectsChanged', 'presentCallbacks', 'presentCallbacksKey',
 ]);
 const CHOICE = new Set(['switchIns']);
 const POKEMON_ACCESSORS: { [key: string]: string } = {
@@ -78,7 +78,14 @@ interface BattleCopy {
 	moves: Map<ActiveMove, ActiveMove>;
 }
 
+type PokemonFiller = (
+	source: Pokemon, pokemon: AnyObject, set: PokemonSet, moveSlots: Pokemon['moveSlots'],
+	copy: BattleCopy, state: typeof State
+) => void;
+
 export const State = new class {
+	pokemonFillers: { keys: string[], fill: PokemonFiller }[] = [];
+
 	// REFERABLE is used to determine which objects are of the Referable type by
 	// comparing their constructors. Unfortunately, we need to set this dynamically
 	// due to circular module dependencies on Battle and Field instead
@@ -274,6 +281,8 @@ export const State = new class {
 
 	fillPokemon(source: Pokemon, pokemon: AnyObject, set: PokemonSet, copy: BattleCopy) {
 		const moveSlots = this.cloneWithRefs(source.moveSlots, copy) as Pokemon['moveSlots'];
+		const fill = this.pokemonFillerFor(source);
+		if (fill) return fill(source, pokemon, set, moveSlots, copy, this);
 		for (const key in source) {
 			const value = (source as AnyObject)[key];
 			// most of a Pokemon's fields are numbers, strings and booleans
@@ -293,18 +302,62 @@ export const State = new class {
 			case 'battle': pokemon.battle = copy.battle; break;
 			case 'set': pokemon.set = set; break;
 			case 'moveSlots': pokemon.moveSlots = moveSlots; break;
-			case 'baseMoveSlots': {
-				let baseMoveSlots;
-				if (source.baseMoveSlots.length !== source.moveSlots.length ||
-					!source.baseMoveSlots.every((ms, i) => ms === source.moveSlots[i])) {
-					baseMoveSlots = this.cloneWithRefs(source.baseMoveSlots, copy) as Pokemon['baseMoveSlots'];
-				}
-				pokemon.baseMoveSlots = this.matchBaseMoveSlots(moveSlots, baseMoveSlots);
-				break;
-			}
+			case 'baseMoveSlots': pokemon.baseMoveSlots = this.baseMoveSlotsOf(source, moveSlots, copy); break;
 			default: this.copyProperty(pokemon, key, value, POKEMON.has(key), copy);
 			}
 		}
+	}
+
+	baseMoveSlotsOf(source: Pokemon, moveSlots: Pokemon['moveSlots'], copy: BattleCopy) {
+		let baseMoveSlots;
+		if (source.baseMoveSlots.length !== source.moveSlots.length ||
+			!source.baseMoveSlots.every((ms, i) => ms === source.moveSlots[i])) {
+			baseMoveSlots = this.cloneWithRefs(source.baseMoveSlots, copy) as Pokemon['baseMoveSlots'];
+		}
+		return this.matchBaseMoveSlots(moveSlots, baseMoveSlots);
+	}
+
+	/**
+	 * Pokemon nearly always have the same fields, so the code that copies them (doing what the loop
+	 * in fillPokemon does) is built once for those fields, and each copy is then a plain property store.
+	 */
+	pokemonFillerFor(source: Pokemon): PokemonFiller | null {
+		next: for (const filler of this.pokemonFillers) {
+			const keys = filler.keys;
+			let i = 0;
+			for (const key in source) {
+				if (keys[i++] !== key) continue next;
+			}
+			if (i === keys.length) return filler.fill;
+		}
+		if (this.pokemonFillers.length >= 16) return null;
+		const keys = [];
+		const lines = [];
+		for (const key in source) {
+			keys.push(key);
+			const k = JSON.stringify(key);
+			switch (key) {
+			case 'getFullDetails': lines.push(`d.getFullDetails = d.fullDetails.bind(d);`); break;
+			case 'getHealth': lines.push(`d.getHealth = d.health.bind(d);`); break;
+			case 'side': lines.push(`d.side = copy.sides[s.side.n];`); break;
+			case 'battle': lines.push(`d.battle = copy.battle;`); break;
+			case 'set': lines.push(`d.set = set;`); break;
+			case 'moveSlots': lines.push(`d.moveSlots = moveSlots;`); break;
+			case 'baseMoveSlots': lines.push(`d.baseMoveSlots = state.baseMoveSlotsOf(s, moveSlots, copy);`); break;
+			default:
+				if (POKEMON.has(key)) {
+					lines.push(`d[${k}] = s[${k}];`);
+				} else {
+					lines.push(`v = s[${k}]; d[${k}] = typeof v === 'object' && v !== null ? state.cloneWithRefs(v, copy) : v;`);
+				}
+			}
+		}
+		const body = `let v;\n${lines.join('\n')}`;
+		// the body only has these field names, quoted with JSON.stringify
+		// eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval
+		const fill = new Function('s', 'd', 'set', 'moveSlots', 'copy', 'state', body) as PokemonFiller;
+		this.pokemonFillers.push({ keys, fill });
+		return fill;
 	}
 
 	// copies a field of a Battle, Field, Side or Pokemon; the ones (de)serialization skips are shared
@@ -459,9 +512,7 @@ export const State = new class {
 		if (state.showCure === undefined) pokemon.showCure = undefined;
 	}
 
-	matchBaseMoveSlots(
-		moveSlots: Pokemon['moveSlots'], baseMoveSlots?: Pokemon['baseMoveSlots']
-	): Pokemon['baseMoveSlots'] {
+	matchBaseMoveSlots(moveSlots: Pokemon['moveSlots'], baseMoveSlots?: Pokemon['baseMoveSlots']) {
 		// baseMoveSlots and moveSlots need to point to the same objects (ie. identity, not equality).
 		// If we serialized the baseMoveSlots, replace any that match moveSlots to preserve the
 		// identity relationship requirement.

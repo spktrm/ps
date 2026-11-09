@@ -34,7 +34,7 @@ import { EmptyBase } from './dex-data';
 import type { DynamaxOptions, MoveRequestData, PokemonMoveRequestData, PokemonSwitchRequestData } from './side';
 
 /** A Pokemon's move slot. */
-interface MoveSlot {
+export interface MoveSlot {
 	id: ID;
 	move: string;
 	pp: number;
@@ -67,6 +67,12 @@ export interface EffectState {
 export const RESTORATIVE_BERRIES = new Set([
 	'leppaberry', 'aguavberry', 'enigmaberry', 'figyberry', 'iapapaberry', 'magoberry', 'sitrusberry', 'wikiberry', 'oranberry',
 ] as ID[]);
+
+const BOOST_TABLE = [1, 1.5, 2, 2.5, 3, 3.5, 4];
+// the events that modify each stat
+const MODIFY_STAT_EVENTS: { [s in StatIDExceptHP]: string } = {
+	atk: 'ModifyAtk', def: 'ModifyDef', spa: 'ModifySpA', spd: 'ModifySpD', spe: 'ModifySpe',
+};
 
 export class Pokemon extends EmptyBase {
 	readonly side: Side;
@@ -109,7 +115,7 @@ export class Pokemon extends EmptyBase {
 	details: string;
 
 	// baseSpecies, status, ability and item are set through accessors that count each change, so the
-	// battle can tell when the effects in it have changed (see Battle#hasPresentEffects)
+	// battle can tell when the effects in it have changed (see Battle#hasPresentEffects and pokemonDefines)
 	_baseSpecies!: Species;
 	get baseSpecies() {
 		return this._baseSpecies;
@@ -117,6 +123,7 @@ export class Pokemon extends EmptyBase {
 	set baseSpecies(baseSpecies: Species) {
 		this._baseSpecies = baseSpecies;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	species: Species;
 	speciesState: EffectState;
@@ -128,6 +135,7 @@ export class Pokemon extends EmptyBase {
 	set status(status: ID) {
 		this._status = status;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	statusState: EffectState;
 	volatiles: { [id: string]: EffectState };
@@ -164,6 +172,7 @@ export class Pokemon extends EmptyBase {
 	set ability(ability: ID) {
 		this._ability = ability;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	abilityState: EffectState;
 
@@ -174,6 +183,7 @@ export class Pokemon extends EmptyBase {
 	set item(item: ID) {
 		this._item = item;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	itemState: EffectState;
 	lastItem: ID;
@@ -375,6 +385,12 @@ export class Pokemon extends EmptyBase {
 	/**
 	 * An object for storing untyped data, for mods to use.
 	 */
+	/** counts changes to this Pokemon's effects (see Battle#pokemonDefines) */
+	effectsChanged: number;
+	/** the callback names this Pokemon's effects define (as bits), and the counts they were worked out at */
+	presentCallbacks: number[] | null;
+	presentCallbacksKey: number[];
+
 	m: {
 		innate?: string, // Partners in Crime
 		originalSpecies?: string, // Mix and Mega
@@ -385,6 +401,9 @@ export class Pokemon extends EmptyBase {
 		super();
 		this.side = side;
 		this.battle = side.battle;
+		this.effectsChanged = 0;
+		this.presentCallbacks = null;
+		this.presentCallbacksKey = [];
 
 		this.m = {};
 
@@ -659,13 +678,12 @@ export class Pokemon extends EmptyBase {
 		boosts[boostName] = boost;
 		boosts = this.battle.runEvent('ModifyBoost', statUser || this, null, null, boosts);
 		boost = boosts[boostName]!;
-		const boostTable = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 		if (boost > 6) boost = 6;
 		if (boost < -6) boost = -6;
 		if (boost >= 0) {
-			stat = Math.floor(stat * boostTable[boost]);
+			stat = Math.floor(stat * BOOST_TABLE[boost]);
 		} else {
-			stat = Math.floor(stat / boostTable[-boost]);
+			stat = Math.floor(stat / BOOST_TABLE[-boost]);
 		}
 
 		// stat modifier
@@ -697,20 +715,18 @@ export class Pokemon extends EmptyBase {
 				boosts = this.battle.runEvent('ModifyBoost', this, null, null, { ...boosts });
 			}
 			let boost = boosts[statName];
-			const boostTable = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 			if (boost > 6) boost = 6;
 			if (boost < -6) boost = -6;
 			if (boost >= 0) {
-				stat = Math.floor(stat * boostTable[boost]);
+				stat = Math.floor(stat * BOOST_TABLE[boost]);
 			} else {
-				stat = Math.floor(stat / boostTable[-boost]);
+				stat = Math.floor(stat / BOOST_TABLE[-boost]);
 			}
 		}
 
 		// stat modifier effects
 		if (!unmodified) {
-			const statTable: { [s in StatIDExceptHP]: string } = { atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
-			stat = this.battle.runEvent('Modify' + statTable[statName], this, null, null, stat);
+			stat = this.battle.runEvent(MODIFY_STAT_EVENTS[statName], this, null, null, stat);
 		}
 
 		if (statName === 'spe' && stat > 10000 && !this.battle.format.battle?.trunc) stat = 10000;

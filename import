@@ -379,6 +379,8 @@ const REWRITES = {
       '\tgetRequestData(): {id: SideID, name: string, pokemon: AnyObject[]} {',
   },
   'sim/pokemon.ts': {
+    // state.ts's declarations name it
+    'interface MoveSlot {': 'export interface MoveSlot {',
     '\thealth() {':
       '\thealth(): {side: SideID, secret: string, shared: string} {',
     '\tgetDetails = () => {':
@@ -473,11 +475,9 @@ const REWRITES = {
     '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {':
       '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {',
     '\t\tconst battle = new Battle(options);': '\t\tconst battle = new Battle(options, dex);',
-    // its inferred return type names a type pokemon.ts doesn't export
-    ['\tmatchBaseMoveSlots(moveSlots: Pokemon[\'moveSlots\'], ' +
-      'baseMoveSlots?: Pokemon[\'baseMoveSlots\']) {']:
-      '\tmatchBaseMoveSlots(\n\t\tmoveSlots: Pokemon[\'moveSlots\'], ' +
-      'baseMoveSlots?: Pokemon[\'baseMoveSlots\']\n\t): Pokemon[\'baseMoveSlots\'] {',
+    // the same line's disable for @pkmn's rules
+    '\t\t// oxlint-disable-next-line typescript/no-implied-eval':
+      '\t\t// eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval',
   },
   // smfh Zarle, please learn how Promises work
   'sim/battle-stream.ts': {

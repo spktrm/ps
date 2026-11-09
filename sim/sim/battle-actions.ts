@@ -15,6 +15,11 @@ import { Dex, toID } from './dex';
 
 const CHOOSABLE_TARGETS = new Set(['normal', 'any', 'adjacentAlly', 'adjacentAllyOrSelf', 'adjacentFoe']);
 
+// the events that modify each stat
+const MODIFY_STAT_EVENTS: { [s in StatIDExceptHP]: string } = {
+	atk: 'ModifyAtk', def: 'ModifyDef', spa: 'ModifySpA', spd: 'ModifySpD', spe: 'ModifySpe',
+};
+
 export class BattleActions {
 	battle: Battle;
 	dex: ModdedDex;
@@ -1742,8 +1747,6 @@ export class BattleActions {
 		let attackStat: StatIDExceptHP = move.overrideOffensiveStat || (isPhysical ? 'atk' : 'spa');
 		const defenseStat: StatIDExceptHP = move.overrideDefensiveStat || (isPhysical ? 'def' : 'spd');
 
-		const statTable = { atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
-
 		let atkBoosts = attacker.boosts[attackStat];
 		let defBoosts = defender.boosts[defenseStat];
 
@@ -1772,8 +1775,8 @@ export class BattleActions {
 		attackStat = (category === 'Physical' ? 'atk' : 'spa');
 
 		// Apply Stat Modifiers
-		attack = this.battle.runEvent('Modify' + statTable[attackStat], source, target, move, attack);
-		defense = this.battle.runEvent('Modify' + statTable[defenseStat], target, source, move, defense);
+		attack = this.battle.runEvent(MODIFY_STAT_EVENTS[attackStat], source, target, move, attack);
+		defense = this.battle.runEvent(MODIFY_STAT_EVENTS[defenseStat], target, source, move, defense);
 
 		if (this.battle.gen <= 4 && ['explosion', 'selfdestruct'].includes(move.id) && defenseStat === 'def') {
 			defense = this.battle.clampIntRange(Math.floor(defense / 2), 1);
