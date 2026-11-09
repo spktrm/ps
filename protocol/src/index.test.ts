@@ -351,6 +351,15 @@ describe('Protocol', () => {
     expect(moveRequest.side.pokemon[2].level).toBe(83);
     expect(moveRequest.active[0]!.moves[0].id).toBe('lightscreen');
     expect(moveRequest.noCancel).toBeUndefined();
+
+    // a request object is read as its JSON would be, and left as it was
+    const side = {...REQUEST.side, toJSON: undefined};
+    const object = {...REQUEST, wait: undefined, rqid: NaN, side};
+    const before = JSON.stringify(object);
+    expect(Protocol.parseRequest(object))
+      .toEqual(Protocol.parseRequest(JSON.stringify(object) as Protocol.RequestJSON));
+    expect(JSON.stringify(object)).toBe(before);
+    expect('wait' in Protocol.parseRequest(object)).toBe(false);
   });
 
   it('#parseNameParts', () => {

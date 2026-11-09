@@ -1898,6 +1898,33 @@ function toID(s: string): ID {
   return ('' + s).toLowerCase().replace(/[^a-z0-9]+/g, '') as ID;
 }
 
+// A copy of plain data as JSON.parse(JSON.stringify(value)) would give, without the text
+function copyJSON(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return typeof value === 'number' && !isFinite(value) ? null : value;
+  }
+  if (typeof (value as {toJSON?: unknown}).toJSON === 'function') {
+    return copyJSON((value as {toJSON(): unknown}).toJSON());
+  }
+  if (Array.isArray(value)) {
+    const out = new Array<unknown>(value.length);
+    for (let i = 0; i < value.length; i++) {
+      const v: unknown = value[i];
+      out[i] = v === undefined || typeof v === 'function' || typeof v === 'symbol'
+        ? null : copyJSON(v);
+    }
+    return out;
+  }
+  const out: {[key: string]: unknown} = {};
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    const v: unknown = (value as {[key: string]: unknown})[key];
+    if (v === undefined || typeof v === 'function' || typeof v === 'symbol') continue;
+    out[key] = copyJSON(v);
+  }
+  return out;
+}
+
 export const ignoreKwArgsSimple = new Set(['chatmsg', 'chatmsg-raw', 'raw', 'error', 'html',
   'inactive', 'inactiveoff', 'warning', 'title', 'formats', 'selectorhtml',
   'pagehtml', 'fieldhtml', 'controlshtml', 'bigerror', 'debug', 'tier',
@@ -2154,8 +2181,12 @@ export const Protocol = new class {
     return {name: fn(effect)};
   }
 
-  parseRequest(json: Protocol.RequestJSON) {
-    const request = JSON.parse(json);
+  /**
+   * Parses a request's JSON, or takes a request object (eg. the simulator's activeRequest), which
+   * it copies as the JSON would have it and leaves as it was.
+   */
+  parseRequest(json: Protocol.RequestJSON | object) {
+    const request: any = typeof json === 'string' ? JSON.parse(json) : copyJSON(json);
     if (!request.requestType) {
       request.requestType = 'move';
       if (request.forceSwitch) {
