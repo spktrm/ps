@@ -382,10 +382,7 @@ export class ModdedDex {
 	 */
 	getActiveMove(move: Move | string): ActiveMove {
 		if (move && typeof (move as ActiveMove).hit === 'number') return move as ActiveMove;
-		move = this.moves.get(move);
-		const moveCopy: ActiveMove = Utils.deepClone(move);
-		moveCopy.hit = 0;
-		return moveCopy;
+		return this.moves.getActive(this.moves.get(move));
 	}
 
 	getHiddenPower(ivs: StatsTable) {

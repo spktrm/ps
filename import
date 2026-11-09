@@ -475,9 +475,6 @@ const REWRITES = {
     '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {':
       '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {',
     '\t\tconst battle = new Battle(options);': '\t\tconst battle = new Battle(options, dex);',
-    // the same line's disable for @pkmn's rules
-    '\t\t// oxlint-disable-next-line typescript/no-implied-eval':
-      '\t\t// eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval',
   },
   // smfh Zarle, please learn how Promises work
   'sim/battle-stream.ts': {
@@ -802,6 +799,9 @@ const changes = async (where, last, now, repo) => ({
           ? rewrite(original, line => line in REWRITES[file] ? REWRITES[file][line] : line)
           : original;
         rewritten = rewritten.replaceAll(/\n[^\n]*@typescript-eslint\/ban-types[^\n]*/g, '');
+        // upstream's lint disable for its new Function, as @pkmn's rules name it
+        rewritten = rewritten.replaceAll('// oxlint-disable-next-line typescript/no-implied-eval',
+          '// eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval');
         if (file.startsWith('sim/dex-')) {
           rewritten = rewritten.replaceAll(/Object.freeze\((.*)\)/g, (_, $1) => $1);
         }

@@ -38,8 +38,8 @@ export default [...pkmn, {
     "no-constant-binary-expression": "off",
     "no-shadow": "off",
     "no-undef": "off",
-    // Showdown's State.cloneBattle makes its blank objects with Reflect.construct
-    "no-restricted-globals": ["error", "Proxy", "WeakSet"],
+    // Showdown's code makes blank objects with Reflect.construct and keeps WeakSets
+    "no-restricted-globals": ["error", "Proxy"],
     "no-unused-vars": "off",
     "no-var": "off",
     "preserve-caught-error": "off",
