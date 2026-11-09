@@ -136,7 +136,7 @@ const IMPORTS = {
     'StatsExceptHPTable', 'MoveTarget', 'SideID', 'ID',
   ],
   'sim/state.ts': [
-    'AnyObject', 'Condition', 'Ability', 'Item', 'Move', 'Species', 'ActiveMove',
+    'AnyObject', 'Condition', 'Ability', 'Item', 'Move', 'Species', 'ActiveMove', 'PokemonSet',
   ],
   'sim/team-validator.ts': [
     'Format', 'StatsTable', 'SparseStatsTable', 'Species', 'AnyObject', 'Move',
@@ -379,8 +379,8 @@ const REWRITES = {
       '\tgetRequestData(): {id: SideID, name: string, pokemon: AnyObject[]} {',
   },
   'sim/pokemon.ts': {
-    '\tgetHealth = () => {':
-      '\tgetHealth = (): {side: SideID, secret: string, shared: string} => {',
+    '\thealth() {':
+      '\thealth(): {side: SideID, secret: string, shared: string} {',
     '\tgetDetails = () => {':
       '\tgetDetails = (): {side: SideID, secret: string, shared: string} => {',
   },
@@ -463,7 +463,7 @@ const REWRITES = {
     '\t\tthis.dex = Dex.forFormat(format);': '\t\tthis.dex = dex.forFormat(format);',
     "\t\t\t\t\tnewSet.species = Dex.species.get(set.species + 'crowned').name;":
       "\t\t\t\t\tnewSet.species = this.dex.species.get(set.species + 'crowned').name;",
-    // a mod's formats only exist on its own dex, so a restored battle needs the dex it was made with
+    // a mod's formats only exist on its own dex, so a restored battle needs the dex it was made on
     '\tstatic fromJSON(serialized: string | AnyObject): Battle {':
       '\tstatic fromJSON(serialized: string | AnyObject, dex = Dex): Battle {',
     '\t\treturn State.deserializeBattle(serialized);':
@@ -472,10 +472,12 @@ const REWRITES = {
   'sim/state.ts': {
     '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {':
       '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {',
-    // a clone is made on its source's dex, as cloneBattle's copy of the line below is rewritten too
-    '\tcloneBattle(source: Battle): Battle {':
-      '\tcloneBattle(source: Battle): Battle {\n\t\tconst dex = source.dex;',
     '\t\tconst battle = new Battle(options);': '\t\tconst battle = new Battle(options, dex);',
+    // its inferred return type names a type pokemon.ts doesn't export
+    ['\tmatchBaseMoveSlots(moveSlots: Pokemon[\'moveSlots\'], ' +
+      'baseMoveSlots?: Pokemon[\'baseMoveSlots\']) {']:
+      '\tmatchBaseMoveSlots(\n\t\tmoveSlots: Pokemon[\'moveSlots\'], ' +
+      'baseMoveSlots?: Pokemon[\'baseMoveSlots\']\n\t): Pokemon[\'baseMoveSlots\'] {',
   },
   // smfh Zarle, please learn how Promises work
   'sim/battle-stream.ts': {

@@ -18,8 +18,9 @@ import {
 import { State } from './state';
 import { type EffectState } from './pokemon';
 import { toID } from './dex';
+import { EmptyBase } from './dex-data';
 
-export class Field {
+export class Field extends EmptyBase {
 	readonly battle: Battle;
 	readonly id: ID;
 
@@ -30,6 +31,7 @@ export class Field {
 	pseudoWeather: { [id: string]: EffectState };
 
 	constructor(battle: Battle) {
+		super();
 		this.battle = battle;
 		const fieldScripts = this.battle.format.field || this.battle.dex.data.Scripts.field;
 		if (fieldScripts) Object.assign(this, fieldScripts);
