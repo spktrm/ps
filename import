@@ -472,6 +472,9 @@ const REWRITES = {
   'sim/state.ts': {
     '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {':
       '\tdeserializeBattle(serialized: string | /* Battle */ AnyObject, dex = Dex): Battle {',
+    // a clone is made on its source's dex, as cloneBattle's copy of the line below is rewritten too
+    '\tcloneBattle(source: Battle): Battle {':
+      '\tcloneBattle(source: Battle): Battle {\n\t\tconst dex = source.dex;',
     '\t\tconst battle = new Battle(options);': '\t\tconst battle = new Battle(options, dex);',
   },
   // smfh Zarle, please learn how Promises work
