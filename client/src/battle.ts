@@ -570,8 +570,8 @@ export class Battle {
   }
 
   /**
-   * A copy of this battle that shares only its dex data and the requests it was sent, which it
-   * never changes. `memo` maps each original it copied to its copy.
+   * A copy of this battle that shares only its dex data, the requests it was sent and its
+   * Pokémon's sets, none of which it changes. `memo` maps each original it copied to its copy.
    */
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);

@@ -1016,7 +1016,8 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
       ? new Pokemon(this.side, BLANK) as any : Object.create(Object.getPrototypeOf(this));
     memo.set(this, pokemon);
     pokemon.side = this.side.clone(memo);
-    pokemon.set = copy(this.set, memo);
+    // never changed once given, so copies share it
+    pokemon.set = this.set;
     pokemon.slot = this.slot;
     pokemon.baseSpeciesForme = this.baseSpeciesForme;
     pokemon.details = this.details;

@@ -337,10 +337,14 @@ describe('Battle', () => {
       battle.add(line);
     }
 
+    const set = {name: 'Mew', species: 'Mew', item: '', ability: 'Synchronize', moves: ['Psychic']};
+    (battle.p2.active[0] as {set?: object}).set = set;
     const memo = new Map<object, object>();
     const clone = battle.clone(memo);
     const mew = battle.p2.active[0]!;
     const copy = clone.p2.active[0]!;
+    // a set is never changed, so a clone shares it
+    expect(copy.set).toBe(set);
 
     expect(clone).not.toBe(battle);
     expect(memo.get(battle)).toBe(clone);

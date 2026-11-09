@@ -370,7 +370,8 @@ export class Side {
     side.provider = this.provider;
     side.battle = this.battle.clone(memo);
     side.n = this.n;
-    side.sets = copy(this.sets, memo);
+    // never changed once given, so copies share them
+    side.sets = this.sets;
     side.id = this.id;
     side.name = this.name;
     side.avatar = this.avatar;
