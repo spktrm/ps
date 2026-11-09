@@ -2088,28 +2088,38 @@ export const Protocol = new class {
   }
 
   parseHealth(hpstring: Protocol.PokemonHPStatus, output = {} as PokemonHealth) {
-    const [hp, status] = hpstring.split(' ');
+    // the HP and the status after it, as split(' ') would give them
+    const space = hpstring.indexOf(' ');
+    const hp = space < 0 ? hpstring : hpstring.slice(0, space);
+    const next = space < 0 ? -1 : hpstring.indexOf(' ', space + 1);
+    const status = space < 0 ? undefined : hpstring.slice(space + 1, next < 0 ? undefined : next);
 
     // parse hp
     output.hpcolor = '';
+    const slash = hp.indexOf('/');
     if (hp === '0' || hp === '0.0') {
       if (!output.maxhp) output.maxhp = 100;
       output.hp = 0;
-    } else if (hp.indexOf('/') > 0) {
-      const [curhp, maxhp] = hp.split('/');
-      if (isNaN(parseFloat(curhp)) || isNaN(parseFloat(maxhp))) {
+    } else if (slash > 0) {
+      const end = hp.indexOf('/', slash + 1);
+      const maxhp = hp.slice(slash + 1, end < 0 ? undefined : end);
+      const cur = parseFloat(hp.slice(0, slash));
+      const max = parseFloat(maxhp);
+      if (isNaN(cur) || isNaN(max)) {
         return null;
       }
-      output.hp = parseFloat(curhp);
-      output.maxhp = parseFloat(maxhp);
-      if (output.hp > output.maxhp) output.hp = output.maxhp;
+      output.hp = cur > max ? max : cur;
+      output.maxhp = max;
       const colorchar = maxhp.slice(-1);
       if (colorchar === 'r' || colorchar === 'y' || colorchar === 'g') {
         output.hpcolor = colorchar;
       }
-    } else if (!isNaN(parseFloat(hp))) {
-      if (!output.maxhp) output.maxhp = 100;
-      output.hp = (output.maxhp * parseFloat(hp)) / 100;
+    } else {
+      const percent = parseFloat(hp);
+      if (!isNaN(percent)) {
+        if (!output.maxhp) output.maxhp = 100;
+        output.hp = (output.maxhp * percent) / 100;
+      }
     }
 
     // parse status
