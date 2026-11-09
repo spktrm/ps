@@ -1,10 +1,10 @@
 'use strict';
 
-// Plays seeded random battles on the simulator, feeds each battle's spectator log to
-// @pkmn/client, and after every update compares what the client tracks with the simulator's own
-// state: the PP each move has used, the item, the abilities, and the toxic and sleep counters. Each
-// battle is played once with Gen 5 seeds and once with sodium seeds (the ChaCha20 PRNG Showdown
-// seeds battles with).
+// Plays seeded random battles on the simulator, feeds each battle's spectator log (or with
+// --player, that player's log and requests) to @pkmn/client, and after every update compares what
+// the client tracks with the simulator's own state: the PP each move has used, the item, the
+// abilities, and the toxic and sleep counters. Each battle is played once with Gen 5 seeds and
+// once with sodium seeds (the ChaCha20 PRNG Showdown seeds battles with).
 
 const path = require('path');
 
@@ -58,6 +58,8 @@ class Differential {
     this.num = options.num || 250;
     this.offset = options.offset || 0;
     this.verbose = !!options.verbose;
+    // the player whose log and requests the client reads, else the spectator's log
+    this.player = options.player;
   }
 
   // Plays `num` battles of the format seeded for the PRNG and returns how many checks ran and the
@@ -80,12 +82,20 @@ class Differential {
     const s = seeds(n, prng);
     const sim = this.sim;
     let pending = [];
+    const channel = this.player ? Number(this.player.slice(1)) : 0;
     const battle = new sim.Battle({
       formatid: format, seed: s.battle,
       send: (type, data) => {
+        if (type === 'sideupdate') {
+          const i = data.indexOf('\n');
+          if (data.slice(0, i) === this.player && data.startsWith('|request|', i + 1)) {
+            pending.push(data.slice(i + 1));
+          }
+          return;
+        }
         if (type !== 'update') return;
         if (Array.isArray(data)) data = data.join('\n');
-        pending.push(...sim.extractChannelMessages(data, [0])[0]);
+        pending.push(...sim.extractChannelMessages(data, [channel])[channel]);
       },
     });
     battle.setPlayer('p1', {name: 'A', seed: s.team.p1});

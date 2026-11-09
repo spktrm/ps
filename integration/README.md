@@ -84,4 +84,6 @@ baseline to compare against, not a pass or fail. The following flags may be used
     `--sim=vendor/pokemon-showdown` after `node build` there) instead of `@pkmn/sim`, to check the
     client against the logs Showdown itself produces.
 - **`--client`**: load `@pkmn/client` from this directory instead, to compare two builds.
+- **`--player`**: feed the client this player's log and requests (`p1` or `p2`), as a player's
+    client sees them, instead of the spectator's log.
 - **`--verbose`**: list each mismatch left at the end of a battle.
