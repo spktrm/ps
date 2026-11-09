@@ -7,7 +7,7 @@ import {
 } from '@pkmn/protocol';
 
 import {Battle, NA, NULL} from './battle';
-import {CloneMemo, cloneable, copyRest} from './clone';
+import {CloneMemo, Fields, cloneable, copy, copyRest, fieldsOf} from './clone';
 import {LastItemEffect, Pokemon} from './pokemon';
 
 const BOOSTS: BoostID[] = ['atk', 'def', 'spa', 'spd', 'spe', 'accuracy', 'evasion'];
@@ -84,11 +84,17 @@ export class Handler implements Protocol.Handler {
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;
-    const handler = Object.create(Object.getPrototypeOf(this));
+    // copies after the first are made by the constructor, so they have the original's shape
+    const handler = HANDLER_FIELDS && this.constructor === Handler
+      ? new Handler(this.battle, this.player) as any : Object.create(Object.getPrototypeOf(this));
     memo.set(this, handler);
+    handler.usedUp = copy(this.usedUp, memo);
+    handler.replaced = copy(this.replaced, memo);
+    handler.eaten = copy(this.eaten, memo);
+    handler.current = copy(this.current, memo);
     handler.battle = this.battle.clone(memo);
     handler.player = this.player;
-    HANDLER_FIELDS ??= new Set(Object.keys(handler));
+    HANDLER_FIELDS ??= fieldsOf(handler);
     copyRest(this, handler, HANDLER_FIELDS, memo);
     return handler;
   }
@@ -1088,7 +1094,7 @@ export class Handler implements Protocol.Handler {
 }
 
 // The fields Handler#clone copies by name, read off its first copy
-let HANDLER_FIELDS: Set<string> | undefined;
+let HANDLER_FIELDS: Fields | undefined;
 
 cloneable(Handler);
 

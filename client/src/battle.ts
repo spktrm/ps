@@ -6,7 +6,7 @@ import {
   PokemonHealth, PokemonIdent, PokemonSearchID, Protocol, SpeciesName,
 } from '@pkmn/protocol';
 
-import {CloneMemo, cloneAll, cloneable, copy, copyRest} from './clone';
+import {CloneMemo, Fields, cloneAll, cloneable, copy, copyRest, fieldsOf} from './clone';
 import {Field} from './field';
 import {Handler} from './handler';
 import {Pokemon} from './pokemon';
@@ -529,7 +529,10 @@ export class Battle {
     this.lastMove = '';
   }
 
-  /** A copy of this battle that shares only its dex data. `memo` maps each original to its copy. */
+  /**
+   * A copy of this battle that shares only its dex data and the requests it was sent, which it
+   * never changes. `memo` maps each original it copied to its copy.
+   */
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;
@@ -555,7 +558,8 @@ export class Battle {
     battle.handler = this.handler.clone(memo);
     battle.turn = this.turn;
     battle.lastMove = this.lastMove;
-    BATTLE_FIELDS ??= new Set(Object.keys(battle));
+    BATTLE_FIELDS ??= fieldsOf(battle, ['request']);
+    if ('request' in this) battle.request = this.request;
     copyRest(this, battle, BATTLE_FIELDS, memo);
     return battle;
   }
@@ -581,6 +585,6 @@ export class Battle {
 }
 
 // The fields Battle#clone copies by name, read off its first copy
-let BATTLE_FIELDS: Set<string> | undefined;
+let BATTLE_FIELDS: Fields | undefined;
 
 cloneable(Battle);

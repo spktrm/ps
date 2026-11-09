@@ -8,7 +8,7 @@ import {
 } from '@pkmn/protocol';
 
 import {NA} from './battle';
-import {CloneMemo, cloneable, copy, copyRest} from './clone';
+import {CloneMemo, Fields, cloneable, copy, copyRest, fieldsOf, keep} from './clone';
 import {Side} from './side';
 
 interface EffectState {
@@ -1011,7 +1011,9 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;
-    const pokemon = Object.create(Object.getPrototypeOf(this));
+    // copies after the first are made by the constructor, so they have the original's shape
+    const pokemon = POKEMON_FIELDS && this.constructor === Pokemon
+      ? new Pokemon(this.side, BLANK) as any : Object.create(Object.getPrototypeOf(this));
     memo.set(this, pokemon);
     pokemon.side = this.side.clone(memo);
     pokemon.set = copy(this.set, memo);
@@ -1033,12 +1035,14 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.newlySwitched = this.newlySwitched;
     pokemon.beingCalledBack = this.beingCalledBack;
     pokemon.statusStage = this.statusStage;
-    pokemon.statusState = copy(this.statusState, memo);
-    pokemon.boosts = copy(this.boosts, memo);
-    pokemon.volatiles = copy(this.volatiles, memo);
+    // these hold only numbers
+    const {statusState, boosts} = this;
+    pokemon.statusState = memo.get(statusState) || keep(statusState, {...statusState}, memo);
+    pokemon.boosts = memo.get(boosts) || keep(boosts, {...boosts}, memo);
+    pokemon.volatiles = memo.get(this.volatiles) || copyVolatiles(this.volatiles, memo);
     pokemon.ability = this.ability;
     pokemon.baseAbility = this.baseAbility;
-    pokemon.illusion = copy(this.illusion, memo);
+    pokemon.illusion = this.illusion?.clone(memo);
     pokemon.revealedDetails = this.revealedDetails;
     pokemon.item = this.item;
     pokemon.itemEffect = this.itemEffect;
@@ -1048,9 +1052,10 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     pokemon.nature = this.nature;
     pokemon.hpType = this.hpType;
     pokemon.terastallized = this.terastallized;
-    pokemon.moveSlots = copy(this.moveSlots, memo);
-    pokemon.maxMoves = copy(this.maxMoves, memo);
-    pokemon.zMoves = copy(this.zMoves, memo);
+    pokemon.moveSlots = memo.get(this.moveSlots) || copySlots(this.moveSlots, memo);
+    // parts of a request, which copies share
+    pokemon.maxMoves = this.maxMoves;
+    pokemon.zMoves = this.zMoves;
     pokemon.canDynamax = this.canDynamax;
     pokemon.canGigantamax = this.canGigantamax;
     pokemon.canMegaEvo = this.canMegaEvo;
@@ -1069,7 +1074,7 @@ export class Pokemon implements DetailedPokemon, PokemonHealth {
     // never changed once taken, so copies can share it
     pokemon.switchInState = this.switchInState;
     pokemon.pressureTaken = this.pressureTaken.length ? copy(this.pressureTaken, memo) : [];
-    POKEMON_FIELDS ??= new Set(Object.keys(pokemon));
+    POKEMON_FIELDS ??= fieldsOf(pokemon);
     copyRest(this, pokemon, POKEMON_FIELDS, memo);
     return pokemon;
   }
@@ -1089,6 +1094,50 @@ const AS_ONE: {[id: string]: ID[] | undefined} = {
 };
 
 // The fields Pokemon#clone copies by name, read off its first copy
-let POKEMON_FIELDS: Set<string> | undefined;
+let POKEMON_FIELDS: Fields | undefined;
+
+// What the constructor needs to make a copy for Pokemon#clone to fill
+const BLANK: DetailedPokemon = {
+  details: '' as PokemonDetails, name: '', speciesForme: '', level: 100, shiny: false,
+  ident: '' as PokemonIdent, searchid: '' as PokemonSearchID,
+};
+
+// Copies a volatiles table and the state of each effect in it
+function copyVolatiles(volatiles: EffectTable, memo: CloneMemo) {
+  const out: EffectTable = {};
+  memo.set(volatiles, out);
+  for (const id in volatiles) {
+    const state = volatiles[id];
+    let copied = memo.get(state) as EffectState | undefined;
+    if (!copied) {
+      copied = keep(state, {...state}, memo);
+      for (const key in copied) {
+        const value = (copied as any)[key];
+        if (value !== null && typeof value === 'object') (copied as any)[key] = copy(value, memo);
+      }
+    }
+    out[id] = copied;
+  }
+  return out;
+}
+
+// Copies a list of move slots and each slot in it
+function copySlots(slots: MoveSlot[], memo: CloneMemo) {
+  const out = new Array<MoveSlot>(slots.length);
+  memo.set(slots, out);
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    let copied = memo.get(slot) as MoveSlot | undefined;
+    if (!copied) {
+      copied = keep(slot, {...slot}, memo);
+      for (const key in copied) {
+        const value = (copied as any)[key];
+        if (value !== null && typeof value === 'object') (copied as any)[key] = copy(value, memo);
+      }
+    }
+    out[i] = copied;
+  }
+  return out;
+}
 
 cloneable(Pokemon);

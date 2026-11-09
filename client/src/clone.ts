@@ -13,15 +13,34 @@ export function copy<T>(value: T, memo: CloneMemo): T {
   if (value === null || typeof value !== 'object') return value;
   const copied = memo.get(value);
   if (copied !== undefined) return copied as T;
+  const proto = Object.getPrototypeOf(value);
+  // a plain array or object is copied whole, then each object in it
+  if (proto === Array.prototype) {
+    const out = (value as unknown as unknown[]).slice();
+    memo.set(value, out);
+    for (let i = 0; i < out.length; i++) {
+      const v = out[i];
+      if (v !== null && typeof v === 'object') out[i] = copy(v, memo);
+    }
+    return out as T;
+  }
+  if (proto === Object.prototype) {
+    const out: any = {...value};
+    memo.set(value, out);
+    for (const key in out) {
+      const v = out[key];
+      if (v !== null && typeof v === 'object') out[key] = copy(v, memo);
+    }
+    return out;
+  }
   if (Array.isArray(value)) {
     const out = new Array(value.length);
     memo.set(value, out);
     for (let i = 0; i < value.length; i++) out[i] = copy(value[i], memo);
     return out as T;
   }
-  const proto = Object.getPrototypeOf(value);
-  if (proto === Object.prototype || proto === null) {
-    const out: any = proto === null ? Object.create(null) : {};
+  if (proto === null) {
+    const out = Object.create(null);
     memo.set(value, out);
     for (const key in value) out[key] = copy(value[key], memo);
     return out;
@@ -64,9 +83,34 @@ export function cloneAll<T extends {clone(memo: CloneMemo): T} | null | undefine
   return out;
 }
 
-/** Copies the fields of `source` that aren't in `named` onto `target`. */
-export function copyRest(source: object, target: object, named: Set<string>, memo: CloneMemo) {
+/** The fields a class's clone copies by name, in the order it copies them. */
+export interface Fields {
+  order: string[];
+  named: Set<string>;
+}
+
+/** The fields a clone has set on its first copy, and any `others` it copies itself. */
+export function fieldsOf(target: object, others: string[] = []): Fields {
+  const order = Object.keys(target);
+  return {order, named: new Set([...order, ...others])};
+}
+
+/** Copies the fields of `source` that aren't named onto `target`. */
+export function copyRest(source: object, target: object, fields: Fields, memo: CloneMemo) {
+  const {order, named} = fields;
+  let i = 0;
   for (const key in source) {
-    if (!named.has(key)) (target as any)[key] = copy((source as any)[key], memo);
+    // the named fields mostly come in the order the clone copies them
+    if (key === order[i]) {
+      i++;
+    } else if (!named.has(key)) {
+      (target as any)[key] = copy((source as any)[key], memo);
+    }
   }
+}
+
+/** Records `copied` as the copy of `value` and returns it. */
+export function keep<T extends object>(value: T, copied: T, memo: CloneMemo): T {
+  memo.set(value, copied);
+  return copied;
 }

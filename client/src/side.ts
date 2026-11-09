@@ -4,7 +4,7 @@ import {
 } from '@pkmn/protocol';
 
 import {Battle} from './battle';
-import {CloneMemo, cloneAll, cloneable, copy, copyRest} from './clone';
+import {CloneMemo, Fields, cloneAll, cloneable, copy, copyRest, fieldsOf} from './clone';
 import {Pokemon} from './pokemon';
 
 export class Side {
@@ -362,7 +362,10 @@ export class Side {
   clone(memo: CloneMemo = new Map()): this {
     const copied = memo.get(this);
     if (copied) return copied as this;
-    const side = Object.create(Object.getPrototypeOf(this));
+    // copies after the first are made by the constructor, so they have the original's shape
+    const side = SIDE_FIELDS && this.constructor === Side
+      ? new Side(this.battle, this.n as 0, undefined, this.provider) as any
+      : Object.create(Object.getPrototypeOf(this));
     memo.set(this, side);
     side.provider = this.provider;
     side.battle = this.battle.clone(memo);
@@ -375,12 +378,12 @@ export class Side {
     side.totalPokemon = this.totalPokemon;
     side.active = cloneAll(this.active, memo);
     side.focus = this.focus;
-    side.lastPokemon = copy(this.lastPokemon, memo);
+    side.lastPokemon = this.lastPokemon ? this.lastPokemon.clone(memo) : null;
     side.team = cloneAll(this.team, memo);
     side.sideConditions = copy(this.sideConditions, memo);
-    side.wisher = copy(this.wisher, memo);
+    side.wisher = this.wisher ? this.wisher.clone(memo) : null;
     side.faints = this.faints;
-    SIDE_FIELDS ??= new Set(Object.keys(side));
+    SIDE_FIELDS ??= fieldsOf(side);
     copyRest(this, side, SIDE_FIELDS, memo);
     return side;
   }
@@ -394,6 +397,6 @@ export class Side {
 }
 
 // The fields Side#clone copies by name, read off its first copy
-let SIDE_FIELDS: Set<string> | undefined;
+let SIDE_FIELDS: Fields | undefined;
 
 cloneable(Side);
