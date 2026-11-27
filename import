@@ -836,6 +836,9 @@ const changes = async (where, last, now, repo) => ({
       if (file.endsWith('formats.ts')) continue;
       let original = fs.readFileSync(path.resolve(ps, file), 'utf8');
       original = original.replaceAll(/import\(.*\)\./g, '');
+      // the stripped self-reference `typeof TeamValidator` cannot name the class it declares
+      original = original.replaceAll('const TeamValidator = this.constructor as typeof TeamValidator;',
+        'const TeamValidator = this.constructor as typeof import(\'@pkmn/sim\').TeamValidator;');
       const match = /^data\/mods\/(champions|gen7letsgo)\/(abilities|items|moves)\.ts$/.exec(file);
       if (match) {
         const [, mod, table] = match;

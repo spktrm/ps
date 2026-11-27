@@ -26,7 +26,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		doublesTier: "DOU",
 	},
 	charizardmegax: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	charizardmegay: {
@@ -150,7 +150,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		tier: "NFE",
 	},
 	nidoqueen: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	nidoranm: {
@@ -167,7 +167,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		tier: "LC",
 	},
 	clefable: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	vulpix: {
@@ -396,7 +396,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		doublesTier: "DOU",
 	},
 	mukalola: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	shellder: {
@@ -442,7 +442,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		tier: "LC",
 	},
 	electrode: {
-		tier: "UU",
+		tier: "OU",
 		doublesTier: "DOU",
 	},
 	exeggcute: {
@@ -453,7 +453,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		doublesTier: "DOU",
 	},
 	exeggutoralola: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	cubone: {
@@ -527,7 +527,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		tier: "LC",
 	},
 	starmie: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	mrmime: {
@@ -620,7 +620,7 @@ export const FormatsData: ModdedSpeciesFormatsDataTable = {
 		doublesTier: "DOU",
 	},
 	aerodactyl: {
-		tier: "OU",
+		tier: "UU",
 		doublesTier: "DOU",
 	},
 	aerodactylmega: {

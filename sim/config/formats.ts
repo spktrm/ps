@@ -245,6 +245,21 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     ]
   },
   {
+    name: '[Gen 9] VGC 2024 Reg G',
+    mod: 'gen9',
+    gameType: 'doubles',
+    bestOfDefault: true,
+    ruleset: [
+      'Flat Rules',
+      '!! Adjust Level = 50',
+      'Min Source Gen = 9',
+      'VGC Timer',
+      'Open Team Sheets',
+      'Limit One Restricted'
+    ],
+    restricted: [ 'Restricted Legendary' ]
+  },
+  {
     name: '[Gen 9] VGC 2025 Reg I',
     mod: 'gen9',
     gameType: 'doubles',
@@ -406,8 +421,8 @@ export const Formats: import('../sim/dex-formats').FormatList = [
       'Mienfoo',         'Mudbray',
       'Sandshrew-Alola', 'Tinkatink',
       'Toedscool',       'Deerling',
-      'Minccino',        'Wingull',
-      'Light Clay'
+      'Minccino',        'Stunky',
+      'Wingull',         'Light Clay'
     ]
   },
   {
@@ -438,33 +453,43 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     ]
   },
   {
-    name: '[Gen 9] National Dex Doubles Ubers',
+    name: '[Gen 9] National Dex Monotype Ubers',
     mod: 'gen9',
-    gameType: 'doubles',
-    ruleset: [ 'Standard Doubles', 'NatDex Mod', '!Gravity Sleep Clause' ],
-    banlist: [ 'Shedinja', 'Assist' ]
-  },
-  {
-    name: '[Gen 3] UU',
-    mod: 'gen3',
-    ruleset: [ 'Standard' ],
-    banlist: [ 'Uber', 'OU', 'UUBL', 'Smeargle + Ingrain', 'Arena Trap', 'Baton Pass', 'Swagger' ]
-  },
-  { name: '[Gen 2] UUBL', mod: 'gen2', ruleset: [ 'Standard' ], banlist: [ 'Uber', 'OU' ] },
-  {
-    name: '[Gen 9] VGC 2024 Reg G',
-    mod: 'gen9',
-    gameType: 'doubles',
-    bestOfDefault: true,
     ruleset: [
-      'Flat Rules',
-      '!! Adjust Level = 50',
-      'Min Source Gen = 9',
-      'VGC Timer',
-      'Open Team Sheets',
-      'Limit One Restricted'
+      'Standard NatDex',
+      'Same Type Clause',
+      'Terastal Clause',
+      '!Evasion Clause',
+      'Evasion Moves Clause',
+      'Evasion Abilities Clause',
+      'Mega Rayquaza Clause',
+      'Dynamax Clause'
     ],
-    restricted: [ 'Restricted Legendary' ]
+    banlist: [
+      'Calyrex-Shadow',   'Gengar-Mega',
+      'Groudon-Primal',   'Koraidon',
+      'Miraidon',         'Marshadow',
+      'Necrozma-Ultra',   'Rayquaza-Mega',
+      'Xerneas',          'Zacian-Crowned',
+      'Zygarde-Complete', 'Moody',
+      'Power Construct',  'Focus Band',
+      "King's Rock",      'Quick Claw',
+      'Ultranecrozium Z', 'Assist',
+      'Baton Pass'
+    ]
+  },
+  {
+    name: '[Gen 4] UU',
+    mod: 'gen4',
+    ruleset: [ '[Gen 4] OU', '!Baton Pass Stat Trap Clause', '!Freeze Clause Mod' ],
+    banlist: [ 'OU', 'UUBL', 'Baton Pass' ],
+    unbanlist: [ 'Arena Trap', 'Snow Cloak', 'Quick Claw', 'Swagger' ]
+  },
+  {
+    name: '[Gen 8 BDSP] Battle Festival Doubles',
+    mod: 'gen8bdsp',
+    gameType: 'doubles',
+    ruleset: [ 'Flat Rules', 'Min Source Gen = 8' ]
   },
   {
     name: '[Gen 9] Balanced Hackmons',
@@ -483,24 +508,25 @@ export const Formats: import('../sim/dex-formats').FormatList = [
       'Terastal Clause'
     ],
     banlist: [
-      'Calyrex-Shadow',   'Deoxys-Attack',  'Gengar-Mega',
-      'Mewtwo-Mega-X',    'Mewtwo-Mega-Y',  'Rayquaza-Mega',
-      'Regigigas',        'Shedinja',       'Slaking',
-      'Arena Trap',       'Contrary',       'Gorilla Tactics',
-      'Hadron Engine',    'Huge Power',     'Illusion',
-      'Innards Out',      'Libero',         'Liquid Ooze',
-      'Magnet Pull',      'Moody',          'Neutralizing Gas',
-      'Orichalcum Pulse', 'Parental Bond',  'Poison Heal',
-      'Protean',          'Pure Power',     'Shadow Tag',
-      'Stakeout',         'Water Bubble',   'Wonder Guard',
-      "King's Rock",      'Razor Fang',     'Baton Pass',
-      'Belly Drum',       'Ceaseless Edge', 'Clangorous Soul',
-      'Dire Claw',        'Electro Shot',   'Fillet Away',
-      'Imprison',         'Last Respects',  'Lumina Crash',
-      'No Retreat',       'Photon Geyser',  'Power Trip',
-      'Quiver Dance',     'Rage Fist',      'Revival Blessing',
-      'Shed Tail',        'Sleep Talk',     'Substitute',
-      'Shell Smash',      'Tail Glow',      'V-create'
+      'Calyrex-Shadow',   'Deoxys-Attack',    'Diancie-Mega',
+      'Gengar-Mega',      'Mewtwo-Mega-X',    'Mewtwo-Mega-Y',
+      'Rayquaza-Mega',    'Regigigas',        'Shedinja',
+      'Slaking',          'Arena Trap',       'Contrary',
+      'Gorilla Tactics',  'Hadron Engine',    'Huge Power',
+      'Illusion',         'Innards Out',      'Libero',
+      'Liquid Ooze',      'Magnet Pull',      'Moody',
+      'Neutralizing Gas', 'Orichalcum Pulse', 'Parental Bond',
+      'Poison Heal',      'Protean',          'Pure Power',
+      'Shadow Tag',       'Stakeout',         'Water Bubble',
+      'Wonder Guard',     "King's Rock",      'Razor Fang',
+      'Baton Pass',       'Belly Drum',       'Ceaseless Edge',
+      'Clangorous Soul',  'Dire Claw',        'Electro Shot',
+      'Fillet Away',      'Imprison',         'Last Respects',
+      'Lumina Crash',     'No Retreat',       'Photon Geyser',
+      'Power Trip',       'Quiver Dance',     'Rage Fist',
+      'Revival Blessing', 'Shed Tail',        'Sleep Talk',
+      'Substitute',       'Shell Smash',      'Tail Glow',
+      'V-create'
     ]
   },
   {
@@ -649,6 +675,13 @@ export const Formats: import('../sim/dex-formats').FormatList = [
       'Baton Pass',    'Dragon Rage',
       'Sonic Boom',    'Sticky Web'
     ]
+  },
+  {
+    name: '[Gen 9] National Dex Doubles Ubers',
+    mod: 'gen9',
+    gameType: 'doubles',
+    ruleset: [ 'Standard Doubles', 'NatDex Mod', '!Gravity Sleep Clause' ],
+    banlist: [ 'Shedinja', 'Assist' ]
   },
   {
     name: '[Gen 9] National Dex Monotype',
@@ -1510,12 +1543,6 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     banlist: [ 'DUber', 'Dark Void' ]
   },
   {
-    name: '[Gen 8 BDSP] Battle Festival Doubles',
-    mod: 'gen8bdsp',
-    gameType: 'doubles',
-    ruleset: [ 'Flat Rules', 'Min Source Gen = 8' ]
-  },
-  {
     name: '[Gen 8] Doubles Custom Game',
     mod: 'gen8',
     gameType: 'doubles',
@@ -2038,7 +2065,7 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     mod: 'gen5',
     bestOfDefault: true,
     ruleset: [ 'Flat Rules' ],
-    banlist: [ 'Dark Void', 'Sky Drop', 'Soul Dew' ]
+    banlist: [ 'Chatot', 'Dark Void', 'Sky Drop', 'Soul Dew' ]
   },
   {
     name: '[Gen 5] Custom Game',
@@ -2086,13 +2113,6 @@ export const Formats: import('../sim/dex-formats').FormatList = [
     ruleset: [ 'Team Preview', 'Cancel Mod' ]
   },
   { name: '[Gen 4] Ubers', mod: 'gen4', ruleset: [ 'Standard' ], banlist: [ 'AG' ] },
-  {
-    name: '[Gen 4] UU',
-    mod: 'gen4',
-    ruleset: [ '[Gen 4] OU', '!Baton Pass Stat Trap Clause', '!Freeze Clause Mod' ],
-    banlist: [ 'OU', 'UUBL', 'Baton Pass' ],
-    unbanlist: [ 'Arena Trap', 'Snow Cloak', 'Quick Claw', 'Swagger' ]
-  },
   {
     name: '[Gen 4] NU',
     mod: 'gen4',
@@ -2210,6 +2230,12 @@ export const Formats: import('../sim/dex-formats').FormatList = [
       'Baton Pass',
       'Swagger'
     ]
+  },
+  {
+    name: '[Gen 3] UU',
+    mod: 'gen3',
+    ruleset: [ 'Standard' ],
+    banlist: [ 'Uber', 'OU', 'UUBL', 'Smeargle + Ingrain', 'Arena Trap', 'Baton Pass', 'Swagger' ]
   },
   {
     name: '[Gen 3] NU',

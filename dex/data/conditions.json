@@ -21,7 +21,7 @@
     "tox": {"inherit": true, "onAfterMoveSelfPriority": 2},
     "confusion": {"name": "confusion", "onBeforeMovePriority": 3},
     "flinch": {"name": "flinch", "duration": 1, "onBeforeMovePriority": 8},
-    "trapped": {"name": "trapped", "noCopy": true},
+    "trapped": {"name": "trapped"},
     "partiallytrapped": {
       "name": "partiallytrapped",
       "duration": 2,
@@ -86,7 +86,6 @@
     "confusion": {"inherit": true},
     "frz": {"inherit": true},
     "substitutebroken": {"noCopy": true},
-    "trapped": {"inherit": true, "noCopy": false},
     "trapper": {"inherit": true, "noCopy": false},
     "partiallytrapped": {
       "inherit": true,
@@ -116,6 +115,7 @@
     "confusion": {"inherit": true},
     "choicelock": {"inherit": true}
   },
+  "7": {"trapped": {"inherit": true, "noCopy": false}},
   "9": {
     "brn": {"name": "brn", "effectType": "Status", "onResidualOrder": 10},
     "par": {
