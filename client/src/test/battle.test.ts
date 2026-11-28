@@ -151,6 +151,40 @@ describe('Battle', () => {
     expect(battle.p2.active[0]).toBeNull();
     expect(battle.p2.team.filter(p => p.fainted).map(p => p.speciesForme)).toEqual(['Rillaboom']);
   });
+  it('#getSwitchedPokemon (the member a disguise poses as comes in beside it)', () => {
+    // a disguised Zoroark stands at p2b as Rillaboom, and the real Rillaboom comes in at p2a
+    const battle = new Battle(GENS);
+    const add = (lines: string[]) => {
+      for (const line of lines) battle.add(line);
+    };
+    add([
+      '|player|p1|Alice|1|', '|player|p2|Bob|2|', '|gametype|doubles', '|gen|9', '|clearpoke',
+      '|poke|p1|Slowbro, L50, M|', '|poke|p1|Audino, L50, F|', '|poke|p2|Incineroar, L50, M|',
+      '|poke|p2|Zoroark-Hisui, L50, M|', '|poke|p2|Rillaboom, L50, M|', '|teampreview|2',
+      '|teamsize|p1|2', '|teamsize|p2|3', '|start',
+      '|switch|p1a: Slowbro|Slowbro, L50, M|170/170', '|switch|p1b: Audino|Audino, L50, F|178/178',
+      '|switch|p2a: Incineroar|Incineroar, L50, M|100/100',
+      '|switch|p2b: Rillaboom|Rillaboom, L50, M|100/100', '|turn|1',
+      '|move|p2b: Rillaboom|Hyper Voice|p1a: Slowbro|[spread] p1a,p1b',
+      '|-damage|p1a: Slowbro|150/170', '|-damage|p1b: Audino|160/178',
+      '|move|p2a: Incineroar|Parting Shot|p1a: Slowbro', '|-unboost|p1a: Slowbro|atk|1',
+      '|switch|p2a: Rillaboom|Rillaboom, L50, M|100/100|[from] Parting Shot',
+    ]);
+    const [entered, disguise] = battle.p2.active;
+    expect(entered).not.toBe(disguise);
+    // both stand, so neither leaves the team, and the disguise's move is not the real one's
+    expect(battle.p2.team).toContain(entered);
+    expect(battle.p2.team).toContain(disguise);
+    expect(entered!.moveSlots.map(m => m.id)).not.toContain('hypervoice');
+
+    add(['|replace|p2b: Zoroark|Zoroark-Hisui, L50, M', '|-end|p2b: Zoroark|Illusion']);
+    const zoroark = battle.p2.active[1]!;
+    expect(zoroark.speciesForme).toBe('Zoroark-Hisui');
+    expect(zoroark.moveSlots.map(m => m.id)).toContain('hypervoice');
+    expect(battle.p2.active[0]).toBe(entered);
+    expect(battle.p2.team).toContain(entered);
+    expect(entered!.moveSlots.map(m => m.id)).not.toContain('hypervoice');
+  });
   it('#getSwitchedPokemon (dragged out)', () => {
     const battle = new Battle(GENS);
     for (const line of [

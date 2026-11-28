@@ -389,7 +389,7 @@ export class Battle {
 
     // pokemon not found, create a new pokemon object for it
     const pokemon = side.addPokemon(
-      Protocol.parseDetails(name, pokemonid as PokemonIdent, details)
+      Protocol.parseDetails(name, pokemonid as PokemonIdent, details), -1, slot
     );
     if (slot >= 0) pokemon.slot = slot;
     return pokemon;

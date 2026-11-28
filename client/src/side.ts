@@ -122,7 +122,7 @@ export class Side {
     delete this.sideConditions[condition];
   }
 
-  addPokemon(details: DetailedPokemon, replaceSlot = -1) {
+  addPokemon(details: DetailedPokemon, replaceSlot = -1, entering = -1) {
     const oldItem = replaceSlot >= 0 ? this.team[replaceSlot]?.item : undefined;
     const set = replaceSlot >= 0
       ? this.team[replaceSlot]?.set
@@ -150,6 +150,15 @@ export class Side {
         if (poke1.searchid in existingTable) {
           const poke2i = existingTable[poke1.searchid];
           const poke2 = this.team[poke2i];
+          // Two standing at once are two Pokemon (one a disguise, kept while it stands), as is one
+          // standing in another slot than the one this comes in at.
+          const other = poke === poke1 ? poke2 : poke === poke2 ? poke1 : undefined;
+          const elsewhere = other !== undefined && entering >= 0 && this.active.includes(other) &&
+            this.active.indexOf(other) !== entering;
+          if (elsewhere || (this.active.includes(poke1) && this.active.includes(poke2))) {
+            existingTable[poke1.searchid] = poke1i;
+            continue;
+          }
           if (poke === poke1) {
             toRemove = poke2i;
           } else if (poke === poke2) {
